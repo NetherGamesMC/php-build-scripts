@@ -5,25 +5,26 @@ ZLIB_VERSION="1.2.11"
 GMP_VERSION="6.2.1"
 CURL_VERSION="curl-7_75_0"
 YAML_VERSION="0.2.5"
-LEVELDB_VERSION="c66f4648c262dfe47ad089aa9af8156c58765c72"
+LEVELDB_VERSION="623f633d3a588f9e478b95a12dc794d25968234f"
 LIBXML_VERSION="2.9.10"
 LIBPNG_VERSION="1.6.37"
 LIBJPEG_VERSION="9d"
-OPENSSL_VERSION="1.1.1i"
+OPENSSL_VERSION="1.1.1k"
 LIBZIP_VERSION="1.7.3"
 SQLITE3_YEAR="2021"
-SQLITE3_VERSION="3340100" #3.34.1
+SQLITE3_VERSION="3350200" #3.35.2
 LIBDEFLATE_VERSION="448e3f3b042219bccb0080e393ba3eb68c2091d5" #1.7
 
 EXT_PTHREADS_VERSION="681b01945bac85f7de81e4db290ae0b685e54b6e"
 EXT_YAML_VERSION="2.2.1"
 EXT_LEVELDB_VERSION="98f2fc73d41e25ce74c59dd49c43380be1cbcf09"
-EXT_CHUNKUTILS2_VERSION="7aec31a9dfc83ddead8870dc0a29159596939680"
-EXT_XDEBUG_VERSION="3.0.2"
+EXT_CHUNKUTILS2_VERSION="0.2.0"
+EXT_XDEBUG_VERSION="3.0.3"
 EXT_IGBINARY_VERSION="3.2.1"
 EXT_DS_VERSION="4fdda13350a3b6c6e3c4de97484f68e203033fec"
-EXT_CRYPTO_VERSION="c8867aa944fa5227eaea9d11a6ce282e64c15af9"
+EXT_CRYPTO_VERSION="0.3.2"
 EXT_RECURSIONGUARD_VERSION="0.1.0"
+EXT_ZSTD_VERSION="0.10.0"
 EXT_LIBDEFLATE_VERSION="be5367c81c61c612271377cdae9ffacac0f6e53a"
 EXT_MORTON_VERSION="0.1.2"
 
@@ -812,6 +813,9 @@ get_github_extension "ds" "$EXT_DS_VERSION" "php-ds" "ext-ds"
 
 get_github_extension "recursionguard" "$EXT_RECURSIONGUARD_VERSION" "pmmp" "ext-recursionguard"
 
+#get_github_extension "zstd" "$EXT_ZSTD_VERSION" "kjdev" "php-ext-zstd"
+get_pecl_extension "zstd" "$EXT_ZSTD_VERSION"
+
 echo -n "  crypto: downloading $EXT_CRYPTO_VERSION..."
 git clone https://github.com/bukka/php-crypto.git "$BUILD_DIR/php/ext/crypto" >> "$DIR/install.log" 2>&1
 cd "$BUILD_DIR/php/ext/crypto"
@@ -955,6 +959,7 @@ $HAVE_MYSQLI \
 --enable-ftp \
 --enable-opcache=$HAVE_OPCACHE \
 --enable-opcache-jit=$HAVE_OPCACHE \
+--enable-zstd \
 --enable-igbinary \
 --enable-ds \
 --with-crypto \
@@ -1029,6 +1034,7 @@ echo "error_reporting=-1" >> "$DIR/bin/php7/bin/php.ini"
 echo "display_errors=1" >> "$DIR/bin/php7/bin/php.ini"
 echo "display_startup_errors=1" >> "$DIR/bin/php7/bin/php.ini"
 echo "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" >> "$DIR/bin/php7/bin/php.ini"
+echo "extension_dir=./bin/php7/lib/php/extensions/no-debug-zts-20200930" >> "$DIR/bin/php7/bin/php.ini"
 
 if [ "$HAVE_OPCACHE" == "yes" ]; then
 	echo "zend_extension=opcache.so" >> "$DIR/bin/php7/bin/php.ini"
