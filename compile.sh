@@ -24,6 +24,7 @@ EXT_IGBINARY_VERSION="3.2.1"
 EXT_DS_VERSION="4fdda13350a3b6c6e3c4de97484f68e203033fec"
 EXT_CRYPTO_VERSION="0.3.2"
 EXT_RECURSIONGUARD_VERSION="0.1.0"
+EXT_ZSTD_VERSION="0.10.0"
 EXT_LIBDEFLATE_VERSION="be5367c81c61c612271377cdae9ffacac0f6e53a"
 EXT_MORTON_VERSION="0.1.2"
 
@@ -810,6 +811,9 @@ get_github_extension "ds" "$EXT_DS_VERSION" "php-ds" "ext-ds"
 
 get_github_extension "recursionguard" "$EXT_RECURSIONGUARD_VERSION" "pmmp" "ext-recursionguard"
 
+#get_github_extension "zstd" "$EXT_ZSTD_VERSION" "kjdev" "php-ext-zstd"
+get_pecl_extension "zstd" "$EXT_ZSTD_VERSION"
+
 echo -n "  crypto: downloading $EXT_CRYPTO_VERSION..."
 git clone https://github.com/bukka/php-crypto.git "$BUILD_DIR/php/ext/crypto" >> "$DIR/install.log" 2>&1
 cd "$BUILD_DIR/php/ext/crypto"
@@ -952,6 +956,7 @@ $HAVE_MYSQLI \
 --enable-cli \
 --enable-ftp \
 --enable-opcache=$HAVE_OPCACHE \
+--enable-zstd \
 --enable-igbinary \
 --enable-ds \
 --with-crypto \
@@ -1026,6 +1031,7 @@ echo "error_reporting=-1" >> "$DIR/bin/php7/bin/php.ini"
 echo "display_errors=1" >> "$DIR/bin/php7/bin/php.ini"
 echo "display_startup_errors=1" >> "$DIR/bin/php7/bin/php.ini"
 echo "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" >> "$DIR/bin/php7/bin/php.ini"
+echo "extension_dir=./bin/php7/lib/php/extensions/no-debug-zts-20180731" >> "$DIR/bin/php7/bin/php.ini"
 
 if [ "$HAVE_OPCACHE" == "yes" ]; then
 	echo "zend_extension=opcache.so" >> "$DIR/bin/php7/bin/php.ini"
