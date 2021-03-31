@@ -21,10 +21,13 @@ jobs:
           path: "./bin"
           key: "build-generic-linux-${{ matrix.php }}-${{ hashFiles('./compile.sh') }}"
       - name: Update APT
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: sudo apt update
       - name: Install dependencies via APT
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: sudo apt install re2c libtool libtool-bin g++ git bison wget gzip make autoconf automake libc-bin bzip2 cmake pkg-config zip
       - name: Compile
+        if: steps.build-cache.outputs.cache-hit != 'true'
         run: ./compile.sh -t linux64 -j 4 -f -g
       - run: tar -czf PHP_Linux.tar.gz bin
       - name: Create and Publish Release
