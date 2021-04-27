@@ -31,6 +31,7 @@ jobs:
           ./compile.sh -t linux64 -j 4 -f -g
           tar -czf PHP_Linux.tar.gz bin
       - name: Create and Publish Release
+        if: steps.build-cache.outputs.cache-hit != 'true'
         uses: marvinpinto/action-automatic-releases@v1.1.1
         with:
           automatic_release_tag: "${{ matrix.php }}"
