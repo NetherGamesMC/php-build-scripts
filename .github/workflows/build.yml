@@ -4,32 +4,32 @@ on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     if: "!contains(github.event.head_commit.message, '[ci skip]')"
     strategy:
       matrix:
-        php: ["8.0.5"]
+        php: ["8.0.7"]
     steps:
       - uses: actions/checkout@v2
-      - run: chmod +x compile.sh
-      - run: export CFLAGS="$CFLAGS -march=x86-64"
-      - run: export CXXFLAGS="$CXXFLAGS -march=x86-64"
       - name: Cache Check
         id: build-cache
         uses: actions/cache@v2
         with:
           path: "./bin"
           key: "build-generic-linux-${{ matrix.php }}-${{ hashFiles('./compile.sh') }}"
-      - name: Update APT
-        if: steps.build-cache.outputs.cache-hit != 'true'
-        run: sudo apt update
       - name: Install dependencies via APT
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: sudo apt install re2c libtool libtool-bin g++ git bison wget gzip make autoconf automake libc-bin bzip2 cmake pkg-config zip
+        run: |
+          sudo apt update
+          sudo apt install -y re2c libtool libtool-bin g++ git bison wget gzip make autoconf automake libc-bin bzip2 cmake pkg-config zip
       - name: Compile
         if: steps.build-cache.outputs.cache-hit != 'true'
-        run: ./compile.sh -t linux64 -j 4 -f -g
-      - run: tar -czf PHP_Linux.tar.gz bin
+        run: |
+          chmod +x compile.sh
+          export CFLAGS="$CFLAGS -march=x86-64"
+          export CXXFLAGS="$CXXFLAGS -march=x86-64"
+          ./compile.sh -t linux64 -j 4 -f -g
+          tar -czf PHP_Linux.tar.gz bin
       - name: Create and Publish Release
         if: steps.build-cache.outputs.cache-hit != 'true'
         uses: marvinpinto/action-automatic-releases@v1.1.1
