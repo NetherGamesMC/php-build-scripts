@@ -38,4 +38,4 @@ jobs:
           repo_token: "${{ secrets.GITHUB_TOKEN }}"
           title: "PHP ${{ matrix.php }} for Linux"
           files: PHP_Linux.tar.gz
-          prerelease: true
+          prerelease: false
