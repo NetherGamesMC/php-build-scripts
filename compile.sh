@@ -27,7 +27,7 @@ EXT_RECURSIONGUARD_VERSION="0.1.0"
 EXT_ZSTD_VERSION="0.10.0"
 EXT_LIBDEFLATE_VERSION="be5367c81c61c612271377cdae9ffacac0f6e53a"
 EXT_MORTON_VERSION="0.1.2"
-EXT_NOISE_VERSION="a7d1617f6b00eec3c099ae86e8777b500c0873fc"
+EXT_MCGENERATOR_VERSION="34f6dd038424839cab9d5aebc7f731a5337658a2"
 
 function write_out {
 	echo "[$1] $2"
@@ -609,7 +609,7 @@ function build_libjpeg {
 	fi
 	#libjpeg
 	echo -n "[libjpeg] downloading $LIBJPEG_VERSION..."
-	download_file "http://ijg.org/files/jpegsrc.v$LIBJPEG_VERSION.tar.gz" | tar -zx >> "$DIR/install.log" 2>&1
+	download_file "https://ijg.org/files/jpegsrc.v$LIBJPEG_VERSION.tar.gz" | tar -zx >> "$DIR/install.log" 2>&1
 	mv jpeg-$LIBJPEG_VERSION libjpeg
 	echo -n " checking..."
 	cd libjpeg
@@ -833,7 +833,7 @@ get_github_extension "libdeflate" "$EXT_LIBDEFLATE_VERSION" "pmmp" "ext-libdefla
 
 get_github_extension "morton" "$EXT_MORTON_VERSION" "pmmp" "ext-morton"
 
-get_github_extension "extnoise" "$EXT_NOISE_VERSION" "NetherGamesMC" "extnoise"
+get_github_extension "mcgenerator" "$EXT_MCGENERATOR_VERSION" "NetherGamesMC" "extnoise"
 
 echo -n "[PHP]"
 
@@ -965,7 +965,7 @@ $HAVE_MYSQLI \
 --enable-zstd \
 --enable-igbinary \
 --enable-ds \
---with-extnoise \
+--with-mcgenerator \
 --with-crypto \
 --enable-recursionguard \
 $HAVE_VALGRIND \
