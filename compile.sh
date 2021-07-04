@@ -965,7 +965,7 @@ $HAVE_MYSQLI \
 --enable-zstd \
 --enable-igbinary \
 --enable-ds \
---with-mcgenerator \
+--enable-mcgenerator \
 --with-crypto \
 --enable-recursionguard \
 $HAVE_VALGRIND \
