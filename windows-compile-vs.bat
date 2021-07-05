@@ -3,7 +3,7 @@
 REM For future users: This file MUST have CRLF line endings. If it doesn't, lots of inexplicable undesirable strange behaviour will result.
 REM Also: Don't modify this version with sed, or it will screw up your line endings.
 set PHP_MAJOR_VER=7.4
-set PHP_VER=%PHP_MAJOR_VER%.18
+set PHP_VER=%PHP_MAJOR_VER%.21
 set PHP_SDK_VER=2.2.0
 set PATH=C:\Program Files\7-Zip;C:\Program Files (x86)\GnuWin32\bin;%PATH%
 set VC_VER=vc15
@@ -21,12 +21,11 @@ set PTHREAD_W32_VER=3.0.0
 set LEVELDB_MCPE_VER=623f633d3a588f9e478b95a12dc794d25968234f
 set LIBDEFLATE_VER=448e3f3b042219bccb0080e393ba3eb68c2091d5
 
-set PHP_PTHREADS_VER=374df2d8cf61a30e7f214a7f00a59a6b24a65c21
+set PHP_PTHREADS_VER=2784d4d17dc53be9e2732a5c11dae199b4a57c93
 set PHP_YAML_VER=2.2.1
 set PHP_CHUNKUTILS2_VER=0.2.0
-set PHP_IGBINARY_VER=3.2.2
+set PHP_IGBINARY_VER=3.2.3
 REM this is 1.2.9 but tags with a "v" prefix are a pain in the ass
-set PHP_DS_VER=4fdda13350a3b6c6e3c4de97484f68e203033fec
 set PHP_LEVELDB_VER=98f2fc73d41e25ce74c59dd49c43380be1cbcf09
 set PHP_CRYPTO_VER=0.3.2
 set PHP_RECURSIONGUARD_VER=0.1.0
@@ -191,7 +190,6 @@ call :get-extension-zip-from-github "pthreads"              "%PHP_PTHREADS_VER%"
 call :get-extension-zip-from-github "yaml"                  "%PHP_YAML_VER%"                  "php"      "pecl-file_formats-yaml"  || exit 1
 call :get-extension-zip-from-github "chunkutils2"           "%PHP_CHUNKUTILS2_VER%"           "pmmp"     "ext-chunkutils2"         || exit 1
 call :get-extension-zip-from-github "igbinary"              "%PHP_IGBINARY_VER%"              "igbinary" "igbinary"                || exit 1
-call :get-extension-zip-from-github "ds"                    "%PHP_DS_VER%"                    "php-ds"   "ext-ds"                  || exit 1
 call :get-extension-zip-from-github "leveldb"               "%PHP_LEVELDB_VER%"               "pmmp"     "php-leveldb"             || exit 1
 call :get-extension-zip-from-github "recursionguard"        "%PHP_RECURSIONGUARD_VER%"        "pmmp"     "ext-recursionguard"      || exit 1
 call :get-extension-zip-from-github "morton"                "%PHP_MORTON_VER%"                "pmmp"     "ext-morton"              || exit 1
@@ -225,7 +223,6 @@ call configure^
  --enable-chunkutils2=shared^
  --enable-com-dotnet^
  --enable-ctype^
- --enable-ds=shared^
  --enable-filter^
  --enable-hash^
  --enable-igbinary=shared^
@@ -299,7 +296,6 @@ call :pm-echo "Generating php.ini..."
 (echo extension=php_openssl.dll)>>"%php_ini%"
 (echo extension=php_chunkutils2.dll)>>"%php_ini%"
 (echo extension=php_igbinary.dll)>>"%php_ini%"
-(echo extension=php_ds.dll)>>"%php_ini%"
 (echo extension=php_leveldb.dll)>>"%php_ini%"
 (echo extension=php_crypto.dll)>>"%php_ini%"
 (echo extension=php_libdeflate.dll)>>"%php_ini%
@@ -312,6 +308,7 @@ call :pm-echo "Generating php.ini..."
 (echo opcache.revalidate_freq=0)>>"%php_ini%"
 (echo opcache.file_update_protection=0)>>"%php_ini%"
 (echo opcache.optimization_level=0x7FFEBFFF)>>"%php_ini%"
+(echo opcache.cache_id=PHP_BINARY ;prevent sharing SHM between different binaries - they won't work because of ASLR)>>"%php_ini%"
 (echo ;Optional extensions, supplied for plugin use)>>"%php_ini%"
 (echo extension=php_gd2.dll)>>"%php_ini%"
 (echo extension=php_mysqli.dll)>>"%php_ini%"
