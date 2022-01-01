@@ -36,6 +36,7 @@ set PHP_LIBDEFLATE_VER=0.1.0
 set PHP_XXHASH_VER=0.1.1
 
 set PHP_VANILLAGENERATOR_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
+set PHP_ZSTD_VER=0.11.0
 
 set script_path=%~dp0
 set log_file=%script_path%compile.log
@@ -206,6 +207,7 @@ call :get-extension-zip-from-github "morton"                "%PHP_MORTON_VER%"  
 call :get-extension-zip-from-github "libdeflate"            "%PHP_LIBDEFLATE_VER%"            "pmmp"     "ext-libdeflate"          || exit 1
 call :get-extension-zip-from-github "xxhash"                "%PHP_XXHASH_VER%"                "pmmp"     "ext-xxhash"              || exit 1
 call :get-extension-zip-from-github "vanillagenerator"      "%PHP_VANILLAGENERATOR_VER%" "NetherGamesMC" "ext-vanillagenerator"    || exit 1
+call :get-extension-zip-from-github "zstd"                  "%PHP_ZSTD_VER%"                  "kjdev"    "php-ext-zstd"            || exit 1
 
 call :pm-echo " - crypto: downloading %PHP_CRYPTO_VER%..."
 git clone https://github.com/bukka/php-crypto.git crypto >>"%log_file%" 2>&1 || exit 1
@@ -250,6 +252,7 @@ call configure^
  --enable-phar^
  --enable-pocketmine-chunkutils=shared^
  --enable-vanillagenerator^
+ --enable-zstd^
  --enable-recursionguard=shared^
  --enable-sockets^
  --enable-tokenizer^
