@@ -207,7 +207,13 @@ call :get-extension-zip-from-github "morton"                "%PHP_MORTON_VER%"  
 call :get-extension-zip-from-github "libdeflate"            "%PHP_LIBDEFLATE_VER%"            "pmmp"     "ext-libdeflate"          || exit 1
 call :get-extension-zip-from-github "xxhash"                "%PHP_XXHASH_VER%"                "pmmp"     "ext-xxhash"              || exit 1
 call :get-extension-zip-from-github "vanillagenerator"      "%PHP_VANILLAGENERATOR_VER%" "NetherGamesMC" "ext-vanillagenerator"    || exit 1
-call :get-extension-zip-from-github "zstd"                  "%PHP_ZSTD_VER%"                  "kjdev"    "php-ext-zstd"            || exit 1
+
+call :pm-echo " - zstd: downloading %PHP_ZSTD_VER%..."
+git clone https://github.com/kjdev/php-ext-zstd.git zstd >>"%log_file%" 2>&1 || exit 1
+cd /D zstd
+git checkout %PHP_ZSTD_VER% >>"%log_file%" 2>&1 || exit 1
+git submodule update --init --recursive >>"%log_file%" 2>&1 || exit 1
+cd /D ..
 
 call :pm-echo " - crypto: downloading %PHP_CRYPTO_VER%..."
 git clone https://github.com/bukka/php-crypto.git crypto >>"%log_file%" 2>&1 || exit 1
@@ -390,7 +396,6 @@ call :pm-echo " - %~1: downloading %~2..."
 call :get-zip https://github.com/%~3/%~4/archive/%~2.zip || exit /B 1
 move %~4-%~2 %~1 >>"%log_file%" 2>&1 || exit /B 1
 exit /B 0
-
 
 :get-zip
 wget %~1 --no-check-certificate -q -O temp.zip || exit /B 1
