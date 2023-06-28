@@ -22,6 +22,9 @@ set LIBYAML_VER=0.2.5
 set PTHREAD_W32_VER=3.0.0
 set LEVELDB_MCPE_VER=1c7564468b41610da4f498430e795ca4de0931ff
 set LIBDEFLATE_VER=495fee110ebb48a5eb63b75fd67e42b2955871e2
+set LIBRDKAFKA_VER=2.1.1
+set LIBZSTD_VER=1.5.5
+set LIBGRPC_VER=1.49.0
 
 set PHP_PTHREADS_VER=4.2.2
 set PHP_PMMPTHREAD_VER=6.0.10
@@ -36,6 +39,9 @@ set PHP_LIBDEFLATE_VER=0.2.1
 set PHP_XXHASH_VER=0.2.0
 set PHP_XDEBUG_VER=3.2.2
 set PHP_ARRAYDEBUG_VER=0.1.0
+set PHP_VANILLAGENERATOR_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
+set PHP_LIBKAFKA_VER=6.0.3
+set PHP_ZSTD_VER=0.12.3
 
 set script_path=%~dp0
 set log_file=%script_path%compile.log
@@ -130,6 +136,210 @@ call bin\phpsdk_deps.bat -u -t %VC_VER% -b %PHP_MAJOR_VER% -a %ARCH% -f -d %DEPS
 
 call :pm-echo "Getting additional dependencies..."
 cd /D "%DEPS_DIR%"
+
+call :pm-echo "Downloading grpc/grpc version %LIBGRPC_VER%..."
+git clone -b v%LIBGRPC_VER% --depth=1 https://github.com/grpc/grpc >>"%log_file%" 2>&1 || exit 1
+cd /D grpc
+
+call :pm-echo "Updating submodules..."
+git submodule update --depth=1 --init >>"%log_file%" 2>&1 || exit 1
+
+call :pm-echo "Generating build configuration..."
+cd cmake
+md build
+cd build
+cmake -GNinja^
+ -DCMAKE_PREFIX_PATH="%DEPS_DIR%"^
+ -DCMAKE_INSTALL_PREFIX="%DEPS_DIR%"^
+ -DCMAKE_BUILD_TYPE="%MSBUILD_CONFIGURATION%"^
+ -DZLIB_LIBRARY="%DEPS_DIR%\lib\zlib_a.lib"^
+ -DgRPC_BUILD_CSHARP_EXT=OFF^
+ -DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF^
+ -DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF^
+ -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF^
+ -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF^
+ -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF^
+ -DgRPC_SSL_PROVIDER="package"^
+ -DgRPC_ZLIB_PROVIDER="package"^
+ ..\.. >>"%log_file%" 2>&1 || exit 1
+
+call :pm-echo "Compiling..."
+cmake --build . >> "%log_file%" 2>&1 || exit 1
+call :pm-echo "Installing files..."
+cmake -P cmake_install.cmake >> "%log_file%" 2>&1 || exit 1
+cd /D "%DEPS_DIR%"
+
+call :pm-echo "Moving php-gRPC extension source..."
+move grpc\src\php\ext\grpc ..\php-src\ext\grpc >> "%log_file%" 2>&1 || exit 1
+move grpc\third_party\protobuf\php\ext\google\protobuf ..\php-src\ext\protobuf >> "%log_file%" 2>&1 || exit 1
+move grpc\third_party\protobuf\third_party ..\php-src\ext\protobuf\third_party >> "%log_file%" 2>&1 || exit 1
+cd ..\php-src\ext\protobuf
+
+call :pm-echo "Generating files..."
+echo|(set /p="ARG_ENABLE("protobuf", "Enable Protobuf extension", "yes");" & echo.) >> config.w32
+echo|(set /p="" & echo.) >> config.w32
+echo|(set /p="if (PHP_PROTOBUF != "no") {" & echo.) >> config.w32
+echo|(set /p="  EXTENSION("protobuf", "arena.c array.c convert.c def.c map.c message.c names.c php-upb.c protobuf.c", PHP_PROTOBUF_SHARED, "");" & echo.) >> config.w32
+echo|(set /p="" & echo.) >> config.w32
+echo|(set /p="  ADD_SOURCES(configure_module_dirname + "/third_party/utf8_range", "naive.c range2-neon.c range2-sse.c", "protobuf");" & echo.) >> config.w32
+echo|(set /p="" & echo.) >> config.w32
+echo|(set /p="  AC_DEFINE('HAVE_PROTOBUF', 1, '');" & echo.) >> config.w32
+echo|(set /p="}" & echo.) >> config.w32
+
+cd ..\grpc
+
+call :pm-echo "Generating config.w32..."
+echo|(set /p="ARG_ENABLE("grpc", "Enable grpc support", "yes");" & echo.) >> config.w32
+echo|(set /p="if (PHP_GRPC != "no") {" & echo.) >> config.w32
+echo|(set /p="if (SETUP_OPENSSL("grpc", PHP_GRPC) &&" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("zlib_a.lib;zlib.lib", "grpc", PHP_GRPC) &&" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("grpc.lib", "grpc", PHP_GRPC) &&" & echo.) >> config.w32
+echo|(set /p="CHECK_HEADER_ADD_INCLUDE("grpc/grpc.h", "CFLAGS_GRPC")) {" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("cares.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("re2.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("address_sorting.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("gpr.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("grpc_authorization_provider.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("grpc_plugin_support.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("upb.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("libprotobuf-lite.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("libprotobuf.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("libprotoc.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_severity.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_raw_logging_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_spinlock_wait.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_malloc_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_base.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_throw_delegate.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_scoped_set_env.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_strerror.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_hashtablez_sampler.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_raw_hash_set.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_crc_cpu_detect.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_crc_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_crc32c.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_crc_cord_state.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_stacktrace.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_symbolize.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_examine_stack.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_failure_signal_handler.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_debugging_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_demangle_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_leak_check.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_program_name.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_config.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_marshalling.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_commandlineflag_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_commandlineflag.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_private_handle_accessor.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_reflection.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_usage_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_usage.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_flags_parse.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_hash.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_city.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_low_level_hash.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_check_op.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_conditions.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_format.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_globals.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_proto.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_message.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_log_sink_set.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_internal_nullguard.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_die_if_null.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_flags.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_globals.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_initialize.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_entry.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_log_sink.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_int128.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_exponential_biased.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_periodic_sampler.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_distributions.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_seed_gen_exception.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_seed_sequences.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_seed_material.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_pool_urbg.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_platform.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_randen.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_randen_slow.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_randen_hwaes.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_randen_hwaes_impl.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_random_internal_distribution_test_util.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_status.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_statusor.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_strings.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_strings_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_str_format_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cord_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cordz_functions.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cordz_handle.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cordz_info.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cordz_sample_token.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_cord.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_graphcycles_internal.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_synchronization.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_time.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_civil_time.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_time_zone.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_bad_any_cast_impl.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_bad_optional_access.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="CHECK_LIB("absl_bad_variant_access.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
+echo|(set /p="EXTENSION("grpc", "byte_buffer.c call.c call_credentials.c channel.c channel_credentials.c completion_queue.c timeval.c server.c server_credentials.c php_grpc.c", PHP_GRPC_SHARED, "");" & echo.) >> config.w32
+echo|(set /p="AC_DEFINE('HAVE_GRPC', 1, '');" & echo.) >> config.w32
+echo|(set /p="} else {" & echo.) >> config.w32
+echo|(set /p="WARNING("php-grpc not enabled; libraries and headers not found");" & echo.) >> config.w32
+echo|(set /p="}" & echo.) >> config.w32
+echo|(set /p="}" & echo.) >> config.w32
+
+cd ..\protobuf
+
+cd /D "%DEPS_DIR%"
+
+call :pm-echo "Downloading zstd version %LIBZSTD_VER%..."
+call :get-zip "https://github.com/facebook/zstd/archive/v%LIBZSTD_VER%.zip" || exit 1
+move zstd-%LIBZSTD_VER% zstd >> "%log_file%" 2>&1
+cd zstd/build/cmake
+call :pm-echo "Generating build configuration..."
+cmake -G "%CMAKE_TARGET%" -A "%ARCH%"^
+ -DCMAKE_PREFIX_PATH="%DEPS_DIR%"^
+ -DCMAKE_INSTALL_PREFIX="%DEPS_DIR%"^
+ -DBUILD_SHARED_LIBS=ON^
+ . >>"%log_file%" 2>&1 || exit 1
+call :pm-echo "Compiling..."
+msbuild ALL_BUILD.vcxproj /p:Configuration=%MSBUILD_CONFIGURATION% /m >>"%log_file%" 2>&1 || exit 1
+call :pm-echo "Installing files..."
+msbuild INSTALL.vcxproj /p:Configuration=%MSBUILD_CONFIGURATION% /m >>"%log_file%" 2>&1 || exit 1
+cd /D "%DEPS_DIR%"
+
+call :pm-echo "Downloading librdkafka version %LIBRDKAFKA_VER%..."
+call :get-zip https://github.com/confluentinc/librdkafka/archive/v%LIBRDKAFKA_VER%.zip || exit 1
+move librdkafka-* librdkafka >>"%log_file%" 2>&1
+cd /D librdkafka
+
+call :pm-echo "Generating build configuration..."
+
+cmake -G "%CMAKE_TARGET%" -A "%ARCH%"^
+ -DCMAKE_PREFIX_PATH="%DEPS_DIR%"^
+ -DCMAKE_INSTALL_PREFIX="%DEPS_DIR%"^
+ -DBUILD_SHARED_LIBS=ON^
+ . >>"%log_file%" 2>&1 || exit 1
+
+call :pm-echo "Compiling..."
+msbuild ALL_BUILD.vcxproj /p:Configuration=%MSBUILD_CONFIGURATION% >>"%log_file%" 2>&1 || exit 1
+call :pm-echo "Installing files..."
+msbuild INSTALL.vcxproj /p:Configuration=%MSBUILD_CONFIGURATION% /m >>"%log_file%" 2>&1 || exit 1
+
+cd /D "%DEPS_DIR%"
+
+REM for no reason, php-rdkafka check for librdkafka and not rdkafka
+REM move them to the appropriate location for php-rdkafka compatibility.
+call :pm-echo "Moving libraries files for php-rdkafka compatibility..."
+move "lib\rdkafka.lib" "lib\librdkafka.lib" >>"%log_file%" 2>&1
+move "lib\rdkafka++.lib" "lib\librdkafka++.lib" >>"%log_file%" 2>&1
 
 call :pm-echo "Downloading LibYAML version %LIBYAML_VER%..."
 call :get-zip https://github.com/yaml/libyaml/archive/%LIBYAML_VER%.zip || exit 1
@@ -236,6 +446,9 @@ call :get-extension-zip-from-github "libdeflate"            "%PHP_LIBDEFLATE_VER
 call :get-extension-zip-from-github "xxhash"                "%PHP_XXHASH_VER%"                "pmmp"     "ext-xxhash"              || exit 1
 call :get-extension-zip-from-github "xdebug"                "%PHP_XDEBUG_VER%"                "xdebug"   "xdebug"                  || exit 1
 call :get-extension-zip-from-github "arraydebug"            "%PHP_ARRAYDEBUG_VER%"            "pmmp"     "ext-arraydebug"          || exit 1
+call :get-extension-zip-from-github "vanillagenerator"      "%PHP_VANILLAGENERATOR_VER%" "NetherGamesMC" "ext-vanillagenerator"    || exit 1
+call :get-extension-zip-from-github "rdkafka"               "%PHP_LIBKAFKA_VER%"             "arnaud-lb" "php-rdkafka"             || exit 1
+call :get-extension-zip-from-github "zstd"                  "%PHP_ZSTD_VER%"             "kjdev"     "php-ext-zstd"                || exit 1
 
 call :pm-echo " - crypto: downloading %PHP_CRYPTO_VER%..."
 git clone https://github.com/bukka/php-crypto.git crypto >>"%log_file%" 2>&1 || exit 1
@@ -279,6 +492,10 @@ call configure^
  --enable-opcache^
  --enable-opcache-jit=%PHP_JIT_ENABLE_ARG%^
  --enable-phar^
+ --enable-vanillagenerator=shared^
+ --enable-zstd^
+ --enable-grpc=shared^
+ --enable-protobuf=shared^
  --enable-recursionguard=shared^
  --enable-sockets^
  --enable-tokenizer^
@@ -309,6 +526,7 @@ call configure^
  --with-xdebug-compression^
  --with-xml^
  --with-yaml^
+ --with-rdkafka=shared^
  --with-pdo-mysql^
  --with-pdo-sqlite^
  --without-readline >>"%log_file%" 2>&1 || call :pm-fatal-error "Error configuring PHP"
@@ -329,7 +547,9 @@ rmdir /s /q "%SOURCES_PATH%\php-src\%ARCH%\Release_TS\php-%PHP_DISPLAY_VER%\lib\
 
 call :pm-echo "Copying artifacts..."
 cd /D "%outpath%"
-mkdir bin
+mkdir bin bin\grpc
+move "%DEPS_DIR%\grpc\cmake\build\grpc_php_plugin.exe" "bin\grpc\grpc_php_plugin.exe"
+move "%DEPS_DIR%\grpc\cmake\build\third_party\protobuf\protoc.exe" "bin\grpc\protoc.exe"
 move "%SOURCES_PATH%\php-src\%ARCH%\%OUT_PATH_REL%_TS\php-%PHP_DISPLAY_VER%" bin\php
 cd /D bin\php
 
@@ -367,6 +587,10 @@ if "%PM_VERSION_MAJOR%" geq "5" (
 (echo ;Optional extensions, supplied for plugin use)>>"%php_ini%"
 (echo extension=php_fileinfo.dll)>>"%php_ini%"
 (echo extension=php_gd.dll)>>"%php_ini%"
+(echo extension=php_grpc.dll)>>"%php_ini%"
+(echo extension=php_protobuf.dll)>>"%php_ini%"
+(echo extension=php_vanillagenerator.dll)>>"%php_ini%"
+(echo extension=php_rdkafka.dll)>>"%php_ini%"
 (echo extension=php_mysqli.dll)>>"%php_ini%"
 (echo extension=php_sqlite3.dll)>>"%php_ini%"
 (echo ;Optional extensions, supplied for debugging)>>"%php_ini%"
