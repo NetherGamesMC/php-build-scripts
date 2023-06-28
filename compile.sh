@@ -13,6 +13,10 @@ OPENSSL_VERSION="3.1.4"
 LIBZIP_VERSION="1.10.1"
 SQLITE3_VERSION="3440200" #3.44.2
 LIBDEFLATE_VERSION="dd12ff2b36d603dbb7fa8838fe7e7176fcbd4f6f" #1.19
+LIBRDKAFKA_VER="2.1.1"
+LIBZSTD_VER="1.5.5"
+LIBGRPC_VER="1.55.1"
+SASL2_VERSION="2.1.28"
 
 EXT_PTHREADS_VERSION="4.2.2"
 EXT_PMMPTHREAD_VERSION="6.0.12"
@@ -28,6 +32,9 @@ EXT_MORTON_VERSION="0.1.2"
 EXT_XXHASH_VERSION="0.2.0"
 EXT_ARRAYDEBUG_VERSION="0.2.0"
 EXT_ENCODING_VERSION="0.2.3"
+EXT_RDKAFKA_VERSION="6.0.3"
+EXT_ZSTD_VERSION="0.12.3"
+EXT_VANILLAGENERATOR_VERSION="56fc48ea1367e1d08b228dfa580b513fbec8ca31"
 
 function write_out {
 	echo "[$1] $2"
@@ -298,6 +305,38 @@ function download_github_src {
 	download_file "https://github.com/$1/archive/$2.tar.gz" "$3"
 }
 
+function git_download_file {
+  local url="$1"
+  local prefix="$2"
+  local git_branch="$3"
+  local git_path="$4"
+  local base_name=${git_path##*/}
+  local cached_filename="$prefix-$base_name.tar.gz"
+
+  if [[ "$DOWNLOAD_CACHE" != "" ]]; then
+    if [[ ! -d "$DOWNLOAD_CACHE" ]]; then
+      mkdir "$DOWNLOAD_CACHE" >> "$DIR/install.log" 2>&1
+    fi
+      if [[ -f "$DOWNLOAD_CACHE/$cached_filename" ]]; then
+      echo "Cache hit for git repository URL: $url" >> "$DIR/install.log"
+      tar xzf "$DOWNLOAD_CACHE/$cached_filename" $git_path >> "$DIR/install.log" 2>&1
+    else
+      echo "Downloading git repository to cache: $url" >> "$DIR/install.log"
+      git clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
+      pushd $git_path >> "$DIR/install.log" 2>&1
+      git submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
+      popd >> "$DIR/install.log" 2>&1
+      tar czf "$DOWNLOAD_CACHE/$cached_filename" $git_path >> "$DIR/install.log" 2>&1
+    fi
+  else
+    echo "Downloading non-cached git repository: $url" >> "$DIR/install.log"
+    git clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
+    pushd $git_path >> "$DIR/install.log" 2>&1
+    git submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
+    popd >> "$DIR/install.log" 2>&1
+  fi
+}
+
 GMP_ABI=""
 TOOLCHAIN_PREFIX=""
 OPENSSL_TARGET=""
@@ -423,8 +462,10 @@ fi
 [ -z "$mtune" ] && mtune=native;
 [ -z "$CFLAGS" ] && CFLAGS="";
 
-if [ "$DO_STATIC" == "no" ]; then
-	[ -z "$LDFLAGS" ] && LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+LDORIGIN_MODIFY="no"
+if [ "$DO_STATIC" == "no" ] && [ -z "$LDFLAGS" ]; then
+	LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	LDORIGIN_MODIFY="yes"
 fi
 
 [ -z "$CONFIGURE_FLAGS" ] && CONFIGURE_FLAGS="";
@@ -503,6 +544,282 @@ write_download
 download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$DIR/install.log" 2>&1
 mv php-src-php-$PHP_VERSION php
 write_done
+
+function build_sasl2 {
+	write_library sasl2 "$SASL2_VERSION"
+	local sasl2_dir="./sasl2-$SASL2_VERSION"
+
+	if cant_use_cache "$sasl2_dir"; then
+		rm -rf "$sasl2_dir"
+		write_download
+		download_file "https://github.com/cyrusimap/cyrus-sasl/archive/cyrus-sasl-$SASL2_VERSION.tar.gz" "sasl2" | tar -zx >> "$DIR/install.log" 2>&1
+		mv cyrus-sasl-cyrus-sasl-$SASL2_VERSION "$sasl2_dir"
+		echo -n "checking... "
+		cd "$sasl2_dir"
+		if [ "$DO_STATIC" == "yes" ]; then
+			local EXTRA_FLAGS="--enable-shared=no --enable-static=yes"
+		else
+			local EXTRA_FLAGS="--enable-shared=yes --enable-static=no"
+		fi
+		NOCONFIGURE="no" ./autogen.sh >> "$DIR/install.log" 2>&1
+		LDFLAGS="$LDFLAGS -L${INSTALL_DIR}/lib" CPPFLAGS="$CPPFLAGS -I${INSTALL_DIR}/include" RANLIB=$RANLIB ./configure \
+		--prefix="$INSTALL_DIR" \
+		--with-openssl="$INSTALL_DIR" \
+		--libdir="$INSTALL_DIR/lib" \
+		$EXTRA_FLAGS \
+		$CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
+
+		echo -n "compiling... "
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$sasl2_dir"
+	fi
+	echo -n "installing... "
+	if [ "$(uname -s)" == "Darwin" ]; then
+	  make install-am >> "$DIR/install.log" 2>&1
+	else
+	  make install >> "$DIR/install.log" 2>&1
+	fi
+	cd ..
+	echo "done!"
+}
+
+function build_zstd {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
+
+	write_library zstd "$LIBZSTD_VER"
+	local zstd_dir="./zstd-$LIBZSTD_VER"
+
+	if cant_use_cache "$zstd_dir"; then
+		rm -rf "$zstd_dir"
+		write_download
+		download_file "https://github.com/facebook/zstd/archive/v$LIBZSTD_VER.tar.gz" "zstd" | tar -zx >> "$DIR/install.log" 2>&1
+		echo -n " checking..."
+		pushd $zstd_dir/build/cmake >> "$DIR/install.log" 2>&1
+	  if [ "$DO_STATIC" != "yes" ]; then
+		  local EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
+	  else
+		  local EXTRA_FLAGS=""
+	  fi
+		cmake . \
+			-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+			-DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+			-DCMAKE_INSTALL_LIBDIR=lib \
+			-DCMAKE_BUILD_TYPE=Release \
+			$CMAKE_GLOBAL_EXTRA_FLAGS \
+			$EXTRA_FLAGS \
+			>> "$DIR/install.log" 2>&1
+		echo -n " compiling..."
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		pushd "$zstd_dir"
+	fi
+	echo -n " installing..."
+	make install >> "$DIR/install.log" 2>&1
+	popd >> "$DIR/install.log" 2>&1
+	echo " done!"
+
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
+}
+
+function build_grpc {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
+	write_library libgrpc "$LIBGRPC_VER"
+  local grpc_dir="./grpc-$LIBZSTD_VER"
+  rm -rf "$grpc_dir"
+  write_download
+  git_download_file "https://github.com/grpc/grpc.git" "grpc" "v$LIBGRPC_VER" $grpc_dir >> "$DIR/install.log" 2>&1
+  echo -n " checking..."
+	pushd $grpc_dir >> "$DIR/install.log" 2>&1
+	if [ "$DO_STATIC" != "yes" ]; then
+		local EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
+	else
+		local EXTRA_FLAGS=""
+	fi
+	mkdir -p cmake/build
+	pushd cmake/build >> "$DIR/install.log" 2>&1
+	cmake ../.. \
+		-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+		-DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+		-DCMAKE_INSTALL_LIBDIR=lib \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DgRPC_INSTALL=ON \
+		-DgRPC_SSL_PROVIDER="package" \
+		-DgRPC_ZLIB_PROVIDER="package" \
+		-DgRPC_BUILD_CSHARP_EXT=OFF \
+		-DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF \
+		-DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF \
+		-DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF \
+		-DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF \
+		-DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF \
+		$CMAKE_GLOBAL_EXTRA_FLAGS \
+		$EXTRA_FLAGS \
+		>> "$DIR/install.log" 2>&1
+	write_compile
+	make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+
+	echo -n " installing..."
+	make install >> "$DIR/install.log" 2>&1
+	popd >> "$DIR/install.log" 2>&1
+	popd >> "$DIR/install.log" 2>&1
+
+	echo -n " copying..."
+	cp -R $grpc_dir/src/php/ext/grpc $BUILD_DIR/php/ext/grpc >> "$DIR/install.log" 2>&1
+	cp -R $grpc_dir/third_party/protobuf/php/ext/google/protobuf $BUILD_DIR/php/ext/protobuf >> "$DIR/install.log" 2>&1
+	cp -R $grpc_dir/third_party/protobuf/third_party $BUILD_DIR/php/ext/protobuf/third_party >> "$DIR/install.log" 2>&1
+	rm $BUILD_DIR/php/ext/grpc/config.m4 2>&1
+
+	# Stupid grpc default m4 config
+	echo 'PHP_ARG_ENABLE(grpc, whether to enable grpc support,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '[  --enable-grpc           Enable grpc support])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'PHP_ARG_ENABLE(tests, whether to compile helper methods for tests,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '[  --enable-tests          Enable tests methods], no, no)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'dnl Check whether to enable tests' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'if test "$PHP_TESTS" != "no"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  CPPFLAGS="$CPPFLAGS -DGRPC_PHP_DEBUG"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'if test "$PHP_GRPC" != "no"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  dnl Write more examples of tests here...' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  dnl # --with-grpc -> check with-path' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  SEARCH_PATH="/usr/local /usr"     # you might want to change this' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  SEARCH_FOR="include/grpc/grpc.h"  # you most likely want to change this' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  if test -r $PHP_GRPC/$SEARCH_FOR; then # path given as parameter' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    GRPC_DIR=$PHP_GRPC' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  else # search default path list' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_MSG_CHECKING([for grpc files in default path])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    for i in $SEARCH_PATH ; do' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      if test -r $i/$SEARCH_FOR; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '        GRPC_DIR=$i' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '        AC_MSG_RESULT(found in $i)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    done' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  if test -z "$GRPC_DIR"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_MSG_RESULT([not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([Please reinstall the grpc distribution])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  dnl # --with-grpc -> add include path' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_ADD_INCLUDE($GRPC_DIR/include)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  LIBS="-lpthread $LIBS"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  dnl  PHP_ADD_LIBRARY(pthread,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  GRPC_SHARED_LIBADD="-lpthread $GRPC_SHARED_LIBADD"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_ADD_LIBRARY(pthread)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_ADD_LIBRARY(dl,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_ADD_LIBRARY(dl)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  case $host in' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    *darwin*)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      PHP_ADD_LIBRARY(c++,1,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      ;;' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    *)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      PHP_ADD_LIBRARY(stdc++,1,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      PHP_ADD_LIBRARY(rt,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      PHP_ADD_LIBRARY(rt)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '      ;;' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  esac' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  GRPC_LIBDIR=$GRPC_DIR/${GRPC_LIB_SUBDIR-lib}' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_ADD_LIBPATH($GRPC_LIBDIR)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_CHECK_LIBRARY(gpr,gpr_now,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  [' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    PHP_ADD_LIBRARY(gpr,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    PHP_ADD_LIBRARY(gpr)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_DEFINE(HAVE_GPRLIB,1,[ ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([wrong gpr lib version or lib not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    -L$GRPC_LIBDIR' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_CHECK_LIBRARY(grpc,grpc_channel_destroy,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  [' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    PHP_ADD_LIBRARY(grpc,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    dnl PHP_ADD_LIBRARY_WITH_PATH(grpc, $GRPC_DIR/lib, GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_DEFINE(HAVE_GRPCLIB,1,[ ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([wrong grpc lib version or lib not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    -L$GRPC_LIBDIR' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_SUBST(GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_NEW_EXTENSION(grpc, byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    channel_credentials.c completion_queue.c timeval.c server.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '    server_credentials.c php_grpc.c, $ext_shared, , -std=c11 -DGRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK=1)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo " done!"
+
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
+}
+
+function build_kafka {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
+
+	write_library librdkafka "$LIBRDKAFKA_VER"
+	local librdkafka_dir="./librdkafka-$LIBRDKAFKA_VER"
+
+	if cant_use_cache "$librdkafka_dir"; then
+		rm -rf "$librdkafka_dir"
+		write_download
+		download_file "https://github.com/confluentinc/librdkafka/archive/v$LIBRDKAFKA_VER.tar.gz" "librdkafka" | tar -zx >> "$DIR/install.log" 2>&1
+		pushd "$librdkafka_dir" >> "$DIR/install.log" 2>&1
+		echo -n " checking..."
+
+		if [ "$DO_STATIC" != "yes" ]; then
+			local EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
+		else
+			local EXTRA_FLAGS=""
+		fi
+
+		cmake . \
+			-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+			-DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+			-DCMAKE_INSTALL_LIBDIR=lib \
+			-DWITH_ZSTD=ON \
+			-DWITH_SSL=ON \
+			-DWITH_CURL=OFF \
+			-DENABLE_LZ4_EXT=OFF \
+			-DCMAKE_BUILD_TYPE=Release \
+			$CMAKE_GLOBAL_EXTRA_FLAGS \
+			$EXTRA_FLAGS \
+			>> "$DIR/install.log" 2>&1
+
+		echo -n " compiling..."
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		pushd "$librdkafka_dir" >> "$DIR/install.log" 2>&1
+	fi
+	echo -n " installing..."
+	make install >> "$DIR/install.log" 2>&1
+	popd >> "$DIR/install.log" 2>&1
+	echo " done!"
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
+}
 
 function build_zlib {
 	if [ "$DO_STATIC" == "yes" ]; then
@@ -604,7 +921,6 @@ function build_openssl {
 		--libdir="$INSTALL_DIR/lib" \
 		no-asm \
 		no-hw \
-		no-engine \
 		$EXTRA_FLAGS >> "$DIR/install.log" 2>&1
 
 		write_compile
@@ -713,6 +1029,9 @@ function build_yaml {
 }
 
 function build_leveldb {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
 	write_library leveldb "$LEVELDB_VERSION"
 	local leveldb_dir="./leveldb-$LEVELDB_VERSION"
 	if cant_use_cache "$leveldb_dir"; then
@@ -753,6 +1072,9 @@ function build_leveldb {
 	make install >> "$DIR/install.log" 2>&1
 	cd ..
 	write_done
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
 }
 
 function build_libpng {
@@ -864,6 +1186,9 @@ function build_libxml2 {
 }
 
 function build_libzip {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
 	#libzip
 	if [ "$DO_STATIC" == "yes" ]; then
 		local CMAKE_LIBZIP_EXTRA_FLAGS="-DBUILD_SHARED_LIBS=OFF"
@@ -905,6 +1230,9 @@ function build_libzip {
 	make install >> "$DIR/install.log" 2>&1
 	cd ..
 	write_done
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
 }
 
 function build_sqlite3 {
@@ -943,6 +1271,9 @@ function build_sqlite3 {
 }
 
 function build_libdeflate {
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
+	fi
 	write_library libdeflate "$LIBDEFLATE_VERSION"
 	local libdeflate_dir="./libdeflate-$LIBDEFLATE_VERSION"
 
@@ -975,6 +1306,9 @@ function build_libdeflate {
 	make install >> "$DIR/install.log" 2>&1
 	cd ..
 	write_done
+	if [ "$LDORIGIN_MODIFY" != "no" ]; then
+		LDFLAGS="-Wl,-rpath='\$\$ORIGIN/../lib' -Wl,-rpath-link='\$\$ORIGIN/../lib'";
+	fi
 }
 
 cd "$LIB_BUILD_DIR"
@@ -983,6 +1317,10 @@ build_zlib
 build_gmp
 build_openssl
 build_curl
+build_sasl2
+build_zstd
+build_kafka
+build_grpc
 build_yaml
 build_leveldb
 if [ "$COMPILE_GD" == "yes" ]; then
@@ -1068,6 +1406,102 @@ get_github_extension "arraydebug" "$EXT_ARRAYDEBUG_VERSION" "pmmp" "ext-arraydeb
 
 get_github_extension "encoding" "$EXT_ENCODING_VERSION" "pmmp" "ext-encoding"
 
+get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_VERSION" "NetherGamesMC" "ext-vanillagenerator"
+
+get_github_extension "rdkafka" "$EXT_RDKAFKA_VERSION" "arnaud-lb" "php-rdkafka"
+
+get_github_extension "zstd" "$EXT_ZSTD_VERSION" "kjdev" "php-ext-zstd"
+
+if [ "$(uname -s)" == "Darwin" ]; then
+	echo "[rdkafka] Implementing quick patch for MacOS support."
+
+	rm $BUILD_DIR/php/ext/rdkafka/config.m4 2>&1
+
+	echo 'PHP_ARG_WITH(rdkafka, for rdkafka support,' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '[  --with-rdkafka             Include rdkafka support])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo 'if test "$PHP_RDKAFKA" != "no"; then' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  SEARCH_PATH="/usr/local /usr"     # you might want to change this' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  SEARCH_FOR="/include/librdkafka/rdkafka.h"  # you most likely want to change this' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  if test -r $PHP_RDKAFKA/$SEARCH_FOR; then # path given as parameter' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    RDKAFKA_DIR=$PHP_RDKAFKA' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  else # search default path list' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_CHECKING([for librdkafka/rdkafka.h" in default path])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    for i in $SEARCH_PATH ; do' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '      if test -r $i/$SEARCH_FOR; then' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '        RDKAFKA_DIR=$i' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '        AC_MSG_RESULT(found in $i)' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '      fi' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    done' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  fi' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  if test -z "$RDKAFKA_DIR"; then' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_RESULT([not found])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([Please reinstall the rdkafka distribution])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  fi' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  PHP_ADD_INCLUDE($RDKAFKA_DIR/include)' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  SOURCES="rdkafka.c metadata.c metadata_broker.c metadata_topic.c metadata_partition.c metadata_collection.c conf.c topic.c queue.c message.c fun.c kafka_consumer.c topic_partition.c"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  LIBNAME=rdkafka' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  LIBSYMBOL=rd_kafka_new' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  PHP_CHECK_LIBRARY($LIBNAME,$LIBSYMBOL,' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  [' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    PHP_ADD_LIBRARY_WITH_PATH($LIBNAME, $RDKAFKA_DIR/$PHP_LIBDIR, RDKAFKA_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_DEFINE(HAVE_RDKAFKALIB,1,[ ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([wrong rdkafka lib version or lib not found])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    -L$RDKAFKA_DIR/$PHP_LIBDIR -lm' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ORIG_LDFLAGS="$LDFLAGS"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ORIG_CPPFLAGS="$CPPFLAGS"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  LDFLAGS="-L$RDKAFKA_DIR/$PHP_LIBDIR -lm"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  CPPFLAGS="-I$RDKAFKA_DIR/include"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  AC_MSG_CHECKING([for librdkafka version])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  AC_EGREP_CPP(yes,[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '#include <librdkafka/rdkafka.h>' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '#if RD_KAFKA_VERSION >= 0x000b0000' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  yes' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '#endif' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_RESULT([>= 0.11.0])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_ERROR([librdkafka version 0.11.0 or greater required.])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  AC_CHECK_LIB($LIBNAME,[rd_kafka_message_headers],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_DEFINE(HAVE_RD_KAFKA_MESSAGE_HEADERS,1,[ ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_WARN([no rd_kafka_message_headers, headers support will not be available])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  AC_CHECK_LIB($LIBNAME,[rd_kafka_purge],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_DEFINE(HAS_RD_KAFKA_PURGE,1,[ ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_WARN([purge is not available])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  AC_CHECK_LIB($LIBNAME,[rd_kafka_msg_partitioner_murmur2],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_DEFINE(HAS_RD_KAFKA_PARTITIONER_MURMUR2,1,[ ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ],[' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '    AC_MSG_WARN([murmur2 partitioner is not available])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  ])' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  LDFLAGS="$ORIG_LDFLAGS"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  CPPFLAGS="$ORIG_CPPFLAGS"' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  PHP_SUBST(RDKAFKA_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo '  PHP_NEW_EXTENSION(rdkafka, $SOURCES, $ext_shared)' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+	echo 'fi' >> "$BUILD_DIR/php/ext/rdkafka/config.m4" 2>&1
+fi
+
 write_library "PHP" "$PHP_VERSION"
 
 write_configure
@@ -1149,6 +1583,7 @@ RANLIB=$RANLIB CFLAGS="$CFLAGS $FLAGS_LTO" CXXFLAGS="$CXXFLAGS $FLAGS_LTO" LDFLA
 --with-libdeflate \
 $HAS_LIBJPEG \
 $HAS_GD \
+--with-rdkafka="$INSTALL_DIR" \
 --with-leveldb="$INSTALL_DIR" \
 --without-readline \
 $HAS_DEBUG \
@@ -1173,6 +1608,7 @@ $THREAD_EXT_FLAGS \
 --with-pdo-sqlite \
 --with-pdo-mysql \
 --with-pic \
+--with-libzstd \
 --enable-phar \
 --enable-ctype \
 --enable-sockets \
@@ -1186,6 +1622,10 @@ $HAVE_MYSQLI \
 --enable-bcmath \
 --enable-cli \
 --enable-ftp \
+--enable-grpc="$INSTALL_DIR" \
+--enable-protobuf \
+--enable-zstd \
+--enable-vanillagenerator \
 --enable-opcache=$HAVE_OPCACHE \
 --enable-opcache-jit=$HAVE_OPCACHE_JIT \
 --enable-igbinary \
@@ -1263,6 +1703,7 @@ echo "error_reporting=-1" >> "$INSTALL_DIR/bin/php.ini"
 echo "display_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "display_startup_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" >> "$INSTALL_DIR/bin/php.ini"
+echo "extension_dir=./$INSTALL_DIR/lib/php/extensions/no-debug-zts-20220829" >> "$INSTALL_DIR/bin/php.ini"
 
 if [ "$HAVE_OPCACHE" == "yes" ]; then
 	echo "zend_extension=opcache.so" >> "$INSTALL_DIR/bin/php.ini"
@@ -1347,6 +1788,8 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -f "$INSTALL_DIR/bin/curl-config"* >> "$DIR/install.log" 2>&1
 	rm -f "$INSTALL_DIR/bin/c_rehash"* >> "$DIR/install.log" 2>&1
 	rm -f "$INSTALL_DIR/bin/openssl"* >> "$DIR/install.log" 2>&1
+	rm -f "$INSTALL_DIR/bin/zstd"* >> "$DIR/install.log" 2>&1
+	rm -f "$INSTALL_DIR/bin/grpc_cpp_plugin" >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/man" >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/share/man" >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/php" >> "$DIR/install.log" 2>&1
@@ -1355,6 +1798,10 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -r -f "$INSTALL_DIR/lib/"*.la >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/include" >> "$DIR/install.log" 2>&1
 fi
+
+echo "[INFO] Checking PHP build works..."
+$INSTALL_DIR/bin/php --version >>"%log_file%" 2>&1
+$INSTALL_DIR/bin/php -m >>"%log_file%" 2>&1
 
 date >> "$DIR/install.log" 2>&1
 write_out "PocketMine" "You should start the server now using \"./start.sh\"."
