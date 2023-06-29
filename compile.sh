@@ -15,7 +15,7 @@ SQLITE3_VERSION="3420000" #3.42.0
 LIBDEFLATE_VERSION="495fee110ebb48a5eb63b75fd67e42b2955871e2" #1.18
 LIBRDKAFKA_VER="2.1.1"
 LIBZSTD_VER="1.5.5"
-LIBGRPC_VER="1.55.1"
+LIBGRPC_VER="1.56.0"
 SASL2_VERSION="2.1.28"
 
 EXT_PTHREADS_VERSION="4.2.2"
@@ -284,6 +284,7 @@ function download_file {
 			echo "Cache hit for URL: $url" >> "$DIR/install.log"
 		else
 			echo "Downloading file to cache: $url" >> "$DIR/install.log"
+      rm -f "$DOWNLOAD_CACHE/$prefix-"* >> "$DIR/install.log" 2>&1
 			_download_file "$1" > "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
 		fi
 		cat "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
@@ -325,6 +326,7 @@ function git_download_file {
       pushd $git_path >> "$DIR/install.log" 2>&1
       git submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
       popd >> "$DIR/install.log" 2>&1
+      rm -f "$DOWNLOAD_CACHE/$prefix-"* >> "$DIR/install.log" 2>&1
       tar czf "$DOWNLOAD_CACHE/$cached_filename" $git_path >> "$DIR/install.log" 2>&1
     fi
   else
