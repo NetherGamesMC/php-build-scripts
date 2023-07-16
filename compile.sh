@@ -15,7 +15,7 @@ SQLITE3_VERSION="3420000" #3.42.0
 LIBDEFLATE_VERSION="495fee110ebb48a5eb63b75fd67e42b2955871e2" #1.18
 LIBRDKAFKA_VER="2.1.1"
 LIBZSTD_VER="1.5.5"
-LIBGRPC_VER="1.56.0"
+LIBGRPC_VER="1.56.2"
 SASL2_VERSION="2.1.28"
 
 EXT_PTHREADS_VERSION="4.2.2"
@@ -1794,7 +1794,13 @@ if [ "$DO_CLEANUP" == "yes" ]; then
 	rm -r -f "$INSTALL_DIR/misc" >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/lib/"*.a >> "$DIR/install.log" 2>&1
 	rm -r -f "$INSTALL_DIR/lib/"*.la >> "$DIR/install.log" 2>&1
-	rm -r -f "$INSTALL_DIR/include" >> "$DIR/install.log" 2>&1
+	mv "$INSTALL_DIR/include" "$INSTALL_DIR/include_copy" >> "$DIR/install.log" 2>&1
+	mkdir "$INSTALL_DIR/include" >> "$DIR/install.log" 2>&1
+	mv "$INSTALL_DIR/include_copy/google" "$INSTALL_DIR/include/google" >> "$DIR/install.log" 2>&1
+	mv "$INSTALL_DIR/include_copy/grpc" "$INSTALL_DIR/include/grpc" >> "$DIR/install.log" 2>&1
+	mv "$INSTALL_DIR/include_copy/grpc++" "$INSTALL_DIR/include/grpc++" >> "$DIR/install.log" 2>&1
+	mv "$INSTALL_DIR/include_copy/grpcpp" "$INSTALL_DIR/include/grpcpp" >> "$DIR/install.log" 2>&1
+	rm -r -f "$INSTALL_DIR/include_copy" >> "$DIR/install.log" 2>&1
 fi
 
 echo "[INFO] Checking PHP build works..."
