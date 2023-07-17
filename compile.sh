@@ -35,6 +35,7 @@ EXT_ENCODING_VERSION="0.2.3"
 EXT_RDKAFKA_VERSION="6.0.3"
 EXT_ZSTD_VERSION="0.12.3"
 EXT_VANILLAGENERATOR_VERSION="56fc48ea1367e1d08b228dfa580b513fbec8ca31"
+EXT_GRPC_VERSION="59399d1958e8a6268e99a382f6ac3b027682f3da"
 
 function write_out {
 	echo "[$1] $2"
@@ -674,9 +675,15 @@ function build_grpc {
 	popd >> "$DIR/install.log" 2>&1
 
 	echo -n " copying..."
-	cp -R $grpc_dir/src/php/ext/grpc $BUILD_DIR/php/ext/grpc >> "$DIR/install.log" 2>&1
 	cp -R $grpc_dir/third_party/protobuf/php/ext/google/protobuf $BUILD_DIR/php/ext/protobuf >> "$DIR/install.log" 2>&1
 	cp -R $grpc_dir/third_party/protobuf/third_party $BUILD_DIR/php/ext/protobuf/third_party >> "$DIR/install.log" 2>&1
+
+	local grpc_dir="./grpc-$EXT_GRPC_VERSION"
+  rm -rf "$grpc_dir"
+
+	download_github_src "larryTheCoder/grpc" "$EXT_GRPC_VERSION" "ext-grpc" | tar -zx
+
+	cp -R $grpc_dir/src/php/ext/grpc $BUILD_DIR/php/ext/grpc >> "$DIR/install.log" 2>&1
 	rm $BUILD_DIR/php/ext/grpc/config.m4 2>&1
 
 	# Stupid grpc default m4 config
@@ -763,7 +770,7 @@ function build_grpc {
 	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '  PHP_SUBST(GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_NEW_EXTENSION(grpc, byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_NEW_EXTENSION(grpc, batch.c byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '    channel_credentials.c completion_queue.c timeval.c server.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '    server_credentials.c php_grpc.c, $ext_shared, , -std=c11 -DGRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK=1)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
