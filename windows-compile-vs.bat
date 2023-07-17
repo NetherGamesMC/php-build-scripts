@@ -24,7 +24,7 @@ set LEVELDB_MCPE_VER=1c7564468b41610da4f498430e795ca4de0931ff
 set LIBDEFLATE_VER=495fee110ebb48a5eb63b75fd67e42b2955871e2
 set LIBRDKAFKA_VER=2.1.1
 set LIBZSTD_VER=1.5.5
-set LIBGRPC_VER=1.56.0
+set LIBGRPC_VER=1.56.2
 
 set PHP_PTHREADS_VER=4.2.2
 set PHP_PMMPTHREAD_VER=6.0.10
@@ -42,6 +42,7 @@ set PHP_ARRAYDEBUG_VER=0.1.0
 set PHP_VANILLAGENERATOR_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
 set PHP_LIBKAFKA_VER=6.0.3
 set PHP_ZSTD_VER=0.12.3
+set PHP_GRPC_VER=59399d1958e8a6268e99a382f6ac3b027682f3da
 
 set script_path=%~dp0
 set log_file=%script_path%compile.log
@@ -170,7 +171,9 @@ cmake -P cmake_install.cmake >> "%log_file%" 2>&1 || exit 1
 cd /D "%DEPS_DIR%"
 
 call :pm-echo "Moving php-gRPC extension source..."
-move grpc\src\php\ext\grpc ..\php-src\ext\grpc >> "%log_file%" 2>&1 || exit 1
+call :get-zip "https://github.com/larryTheCoder/grpc/archive/%PHP_GRPC_VER%.zip" || exit 1
+
+move grpc-%PHP_GRPC_VER%\src\php\ext\grpc ..\php-src\ext\grpc >> "%log_file%" 2>&1 || exit 1
 move grpc\third_party\protobuf\php\ext\google\protobuf ..\php-src\ext\protobuf >> "%log_file%" 2>&1 || exit 1
 move grpc\third_party\protobuf\third_party ..\php-src\ext\protobuf\third_party >> "%log_file%" 2>&1 || exit 1
 cd ..\php-src\ext\protobuf
@@ -288,7 +291,7 @@ echo|(set /p="CHECK_LIB("absl_time_zone.lib", "grpc", PHP_GRPC);" & echo.) >> co
 echo|(set /p="CHECK_LIB("absl_bad_any_cast_impl.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
 echo|(set /p="CHECK_LIB("absl_bad_optional_access.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
 echo|(set /p="CHECK_LIB("absl_bad_variant_access.lib", "grpc", PHP_GRPC);" & echo.) >> config.w32
-echo|(set /p="EXTENSION("grpc", "byte_buffer.c call.c call_credentials.c channel.c channel_credentials.c completion_queue.c timeval.c server.c server_credentials.c php_grpc.c", PHP_GRPC_SHARED, "");" & echo.) >> config.w32
+echo|(set /p="EXTENSION("grpc", "batch.c byte_buffer.c call.c call_credentials.c channel.c channel_credentials.c completion_queue.c timeval.c server.c server_credentials.c php_grpc.c", PHP_GRPC_SHARED, "");" & echo.) >> config.w32
 echo|(set /p="AC_DEFINE('HAVE_GRPC', 1, '');" & echo.) >> config.w32
 echo|(set /p="} else {" & echo.) >> config.w32
 echo|(set /p="WARNING("php-grpc not enabled; libraries and headers not found");" & echo.) >> config.w32
