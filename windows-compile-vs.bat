@@ -39,7 +39,8 @@ set PHP_LIBDEFLATE_VER=0.2.1
 set PHP_XXHASH_VER=0.2.0
 set PHP_XDEBUG_VER=3.2.2
 set PHP_ARRAYDEBUG_VER=0.1.0
-set PHP_VANILLAGENERATOR_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
+set PHP_VANILLAGENERATOR_PM4_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
+set PHP_VANILLAGENERATOR_PM5_VER=2.1.1
 set PHP_LIBKAFKA_VER=6.0.3
 set PHP_ZSTD_VER=0.12.3
 
@@ -431,10 +432,12 @@ cd /D php-src\ext
 
 set THREAD_EXT_FLAGS=""
 if "%PM_VERSION_MAJOR%" geq "5" (
-    call :get-extension-zip-from-github "pmmpthread" "%PHP_PMMPTHREAD_VER%" "pmmp" "ext-pmmpthread" || exit 1
+    call :get-extension-zip-from-github "pmmpthread"        "%PHP_PMMPTHREAD_VER%"              "pmmp"              "ext-pmmpthread"        || exit 1
+    call :get-extension-zip-from-github "vanillagenerator"  "%PHP_VANILLAGENERATOR_PM5_VER%"    "NetherGamesMC"     "ext-vanillagenerator"  || exit 1
     set THREAD_EXT_FLAGS="--with-pmmpthread=shared"
 ) else (
-    call :get-extension-zip-from-github "pthreads" "%PHP_PTHREADS_VER%" "pmmp" "ext-pmmpthread" || exit 1
+    call :get-extension-zip-from-github "pthreads"          "%PHP_PTHREADS_VER%"                "pmmp"              "ext-pmmpthread"        || exit 1
+    call :get-extension-zip-from-github "vanillagenerator"  "%PHP_VANILLAGENERATOR_PM4_VER%"    "NetherGamesMC"     "ext-vanillagenerator"  || exit 1
     set THREAD_EXT_FLAGS="--with-pthreads=shared"
 )
 call :get-extension-zip-from-github "yaml"                  "%PHP_YAML_VER%"                  "php"      "pecl-file_formats-yaml"  || exit 1
@@ -447,7 +450,6 @@ call :get-extension-zip-from-github "libdeflate"            "%PHP_LIBDEFLATE_VER
 call :get-extension-zip-from-github "xxhash"                "%PHP_XXHASH_VER%"                "pmmp"     "ext-xxhash"              || exit 1
 call :get-extension-zip-from-github "xdebug"                "%PHP_XDEBUG_VER%"                "xdebug"   "xdebug"                  || exit 1
 call :get-extension-zip-from-github "arraydebug"            "%PHP_ARRAYDEBUG_VER%"            "pmmp"     "ext-arraydebug"          || exit 1
-call :get-extension-zip-from-github "vanillagenerator"      "%PHP_VANILLAGENERATOR_VER%" "NetherGamesMC" "ext-vanillagenerator"    || exit 1
 call :get-extension-zip-from-github "rdkafka"               "%PHP_LIBKAFKA_VER%"             "arnaud-lb" "php-rdkafka"             || exit 1
 call :get-extension-zip-from-github "zstd"                  "%PHP_ZSTD_VER%"             "kjdev"     "php-ext-zstd"                || exit 1
 
