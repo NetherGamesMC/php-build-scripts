@@ -34,8 +34,8 @@ EXT_ARRAYDEBUG_VERSION="0.2.0"
 EXT_ENCODING_VERSION="0.2.3"
 EXT_RDKAFKA_VERSION="6.0.3"
 EXT_ZSTD_VERSION="0.12.3"
-EXT_VANILLAGENERATOR_VERSION="56fc48ea1367e1d08b228dfa580b513fbec8ca31"
-EXT_GRPC_VERSION="59399d1958e8a6268e99a382f6ac3b027682f3da"
+EXT_VANILLAGENERATOR_PM4_VERSION="fad1037c6e41af87277fcfbf86debfd8becdc826"
+EXT_VANILLAGENERATOR_PM5_VERSION="2.1.1"
 
 function write_out {
 	echo "[$1] $2"
@@ -615,7 +615,7 @@ function build_zstd {
 			$CMAKE_GLOBAL_EXTRA_FLAGS \
 			$EXTRA_FLAGS \
 			>> "$DIR/install.log" 2>&1
-		echo -n " compiling..."
+		write_compile
 		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
 	else
 		write_caching
@@ -635,39 +635,46 @@ function build_grpc {
 	if [ "$LDORIGIN_MODIFY" != "no" ]; then
 		LDFLAGS="-Wl,-rpath='\$ORIGIN/../lib' -Wl,-rpath-link='\$ORIGIN/../lib'";
 	fi
+
 	write_library libgrpc "$LIBGRPC_VER"
-  local grpc_dir="./grpc-$LIBZSTD_VER"
-  rm -rf "$grpc_dir"
-  write_download
-  git_download_file "https://github.com/grpc/grpc.git" "grpc" "v$LIBGRPC_VER" $grpc_dir >> "$DIR/install.log" 2>&1
-  echo -n " checking..."
-	pushd $grpc_dir >> "$DIR/install.log" 2>&1
-	if [ "$DO_STATIC" != "yes" ]; then
-		local EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
-	else
-		local EXTRA_FLAGS=""
+  local grpc_dir="./grpc-$LIBGRPC_VER"
+
+  if cant_use_cache "$grpc_dir"; then
+    rm -rf "$grpc_dir"
+    write_download
+    git_download_file "https://github.com/grpc/grpc.git" "grpc" "v$LIBGRPC_VER" $grpc_dir >> "$DIR/install.log" 2>&1
+    echo -n " checking..."
+    pushd $grpc_dir >> "$DIR/install.log" 2>&1
+    if [ "$DO_STATIC" != "yes" ]; then
+      local EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
+    else
+      local EXTRA_FLAGS=""
+    fi
+    mkdir -p cmake/build
+    pushd cmake/build >> "$DIR/install.log" 2>&1
+    cmake ../.. \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+      -DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+      -DCMAKE_INSTALL_LIBDIR=lib \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DgRPC_INSTALL=ON \
+      -DgRPC_SSL_PROVIDER="package" \
+      -DgRPC_ZLIB_PROVIDER="package" \
+      -DgRPC_BUILD_CSHARP_EXT=OFF \
+      -DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF \
+      -DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF \
+      -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF \
+      -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF \
+      -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF \
+      $CMAKE_GLOBAL_EXTRA_FLAGS \
+      $EXTRA_FLAGS \
+      >> "$DIR/install.log" 2>&1
+    write_compile
+    make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+  else
+		write_caching
+		pushd "$grpc_dir/cmake/build"
 	fi
-	mkdir -p cmake/build
-	pushd cmake/build >> "$DIR/install.log" 2>&1
-	cmake ../.. \
-		-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
-		-DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
-		-DCMAKE_INSTALL_LIBDIR=lib \
-		-DCMAKE_BUILD_TYPE=Release \
-		-DgRPC_INSTALL=ON \
-		-DgRPC_SSL_PROVIDER="package" \
-		-DgRPC_ZLIB_PROVIDER="package" \
-		-DgRPC_BUILD_CSHARP_EXT=OFF \
-		-DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF \
-		-DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF \
-		-DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF \
-		-DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF \
-		-DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF \
-		$CMAKE_GLOBAL_EXTRA_FLAGS \
-		$EXTRA_FLAGS \
-		>> "$DIR/install.log" 2>&1
-	write_compile
-	make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
 
 	echo -n " installing..."
 	make install >> "$DIR/install.log" 2>&1
@@ -677,12 +684,6 @@ function build_grpc {
 	echo -n " copying..."
 	cp -R $grpc_dir/third_party/protobuf/php/ext/google/protobuf $BUILD_DIR/php/ext/protobuf >> "$DIR/install.log" 2>&1
 	cp -R $grpc_dir/third_party/protobuf/third_party $BUILD_DIR/php/ext/protobuf/third_party >> "$DIR/install.log" 2>&1
-
-	local grpc_dir="./grpc-$EXT_GRPC_VERSION"
-  rm -rf "$grpc_dir"
-
-	download_github_src "larryTheCoder/grpc" "$EXT_GRPC_VERSION" "ext-grpc" | tar -zx
-
 	cp -R $grpc_dir/src/php/ext/grpc $BUILD_DIR/php/ext/grpc >> "$DIR/install.log" 2>&1
 	rm $BUILD_DIR/php/ext/grpc/config.m4 2>&1
 
@@ -770,7 +771,7 @@ function build_grpc {
 	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '  PHP_SUBST(GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_NEW_EXTENSION(grpc, batch.c byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
+	echo '  PHP_NEW_EXTENSION(grpc, byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '    channel_credentials.c completion_queue.c timeval.c server.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo '    server_credentials.c php_grpc.c, $ext_shared, , -std=c11 -DGRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK=1)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
@@ -1415,7 +1416,11 @@ get_github_extension "arraydebug" "$EXT_ARRAYDEBUG_VERSION" "pmmp" "ext-arraydeb
 
 get_github_extension "encoding" "$EXT_ENCODING_VERSION" "pmmp" "ext-encoding"
 
-get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_VERSION" "NetherGamesMC" "ext-vanillagenerator"
+if [ "$PM_VERSION_MAJOR" -ge 5 ]; then
+	get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_PM5_VERSION" "NetherGamesMC" "ext-vanillagenerator"
+else
+	get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_PM4_VERSION" "NetherGamesMC" "ext-vanillagenerator"
+fi
 
 get_github_extension "rdkafka" "$EXT_RDKAFKA_VERSION" "arnaud-lb" "php-rdkafka"
 
