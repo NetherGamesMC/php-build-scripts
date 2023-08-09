@@ -33,6 +33,7 @@ EXT_XXHASH_VERSION="0.2.0"
 EXT_ARRAYDEBUG_VERSION="0.1.0"
 EXT_RDKAFKA_VERSION="6.0.3"
 EXT_ZSTD_VERSION="0.12.3"
+EXT_GRPC_VERSION="1.57.0"
 EXT_VANILLAGENERATOR_PM4_VERSION="56fc48ea1367e1d08b228dfa580b513fbec8ca31"
 EXT_VANILLAGENERATOR_PM5_VERSION="2.1.2"
 
@@ -683,97 +684,7 @@ function build_grpc {
 	echo -n " copying..."
 	cp -R $grpc_dir/third_party/protobuf/php/ext/google/protobuf $BUILD_DIR/php/ext/protobuf >> "$DIR/install.log" 2>&1
 	cp -R $grpc_dir/third_party/protobuf/third_party $BUILD_DIR/php/ext/protobuf/third_party >> "$DIR/install.log" 2>&1
-	cp -R $grpc_dir/src/php/ext/grpc $BUILD_DIR/php/ext/grpc >> "$DIR/install.log" 2>&1
-	rm $BUILD_DIR/php/ext/grpc/config.m4 2>&1
 
-	# Stupid grpc default m4 config
-	echo 'PHP_ARG_ENABLE(grpc, whether to enable grpc support,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '[  --enable-grpc           Enable grpc support])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'PHP_ARG_ENABLE(tests, whether to compile helper methods for tests,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '[  --enable-tests          Enable tests methods], no, no)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'dnl Check whether to enable tests' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'if test "$PHP_TESTS" != "no"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  CPPFLAGS="$CPPFLAGS -DGRPC_PHP_DEBUG"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'if test "$PHP_GRPC" != "no"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  dnl Write more examples of tests here...' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  dnl # --with-grpc -> check with-path' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  SEARCH_PATH="/usr/local /usr"     # you might want to change this' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  SEARCH_FOR="include/grpc/grpc.h"  # you most likely want to change this' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  if test -r $PHP_GRPC/$SEARCH_FOR; then # path given as parameter' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    GRPC_DIR=$PHP_GRPC' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  else # search default path list' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_MSG_CHECKING([for grpc files in default path])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    for i in $SEARCH_PATH ; do' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      if test -r $i/$SEARCH_FOR; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '        GRPC_DIR=$i' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '        AC_MSG_RESULT(found in $i)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    done' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  if test -z "$GRPC_DIR"; then' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_MSG_RESULT([not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_MSG_ERROR([Please reinstall the grpc distribution])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  dnl # --with-grpc -> add include path' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_ADD_INCLUDE($GRPC_DIR/include)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  LIBS="-lpthread $LIBS"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  dnl  PHP_ADD_LIBRARY(pthread,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  GRPC_SHARED_LIBADD="-lpthread $GRPC_SHARED_LIBADD"' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_ADD_LIBRARY(pthread)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_ADD_LIBRARY(dl,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_ADD_LIBRARY(dl)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  case $host in' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    *darwin*)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      PHP_ADD_LIBRARY(c++,1,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      ;;' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    *)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      PHP_ADD_LIBRARY(stdc++,1,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      PHP_ADD_LIBRARY(rt,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      PHP_ADD_LIBRARY(rt)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '      ;;' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  esac' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  GRPC_LIBDIR=$GRPC_DIR/${GRPC_LIB_SUBDIR-lib}' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_ADD_LIBPATH($GRPC_LIBDIR)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_CHECK_LIBRARY(gpr,gpr_now,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  [' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    PHP_ADD_LIBRARY(gpr,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    PHP_ADD_LIBRARY(gpr)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_DEFINE(HAVE_GPRLIB,1,[ ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_MSG_ERROR([wrong gpr lib version or lib not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    -L$GRPC_LIBDIR' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_CHECK_LIBRARY(grpc,grpc_channel_destroy,' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  [' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    PHP_ADD_LIBRARY(grpc,,GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    dnl PHP_ADD_LIBRARY_WITH_PATH(grpc, $GRPC_DIR/lib, GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_DEFINE(HAVE_GRPCLIB,1,[ ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    AC_MSG_ERROR([wrong grpc lib version or lib not found])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ],[' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    -L$GRPC_LIBDIR' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  ])' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_SUBST(GRPC_SHARED_LIBADD)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '  PHP_NEW_EXTENSION(grpc, byte_buffer.c call.c call_credentials.c channel.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    channel_credentials.c completion_queue.c timeval.c server.c \' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo '    server_credentials.c php_grpc.c, $ext_shared, , -std=c11 -DGRPC_POSIX_FORK_ALLOW_PTHREAD_ATFORK=1)' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
-	echo 'fi' >> "$BUILD_DIR/php/ext/grpc/config.m4" 2>&1
 	echo " done!"
 
 	if [ "$LDORIGIN_MODIFY" != "no" ]; then
@@ -1412,6 +1323,8 @@ get_github_extension "morton" "$EXT_MORTON_VERSION" "pmmp" "ext-morton"
 get_github_extension "xxhash" "$EXT_XXHASH_VERSION" "pmmp" "ext-xxhash"
 
 get_github_extension "arraydebug" "$EXT_ARRAYDEBUG_VERSION" "pmmp" "ext-arraydebug"
+
+get_github_extension "grpc" "$EXT_GRPC_VERSION" "larryTheCoder" "php-grpc"
 
 if [ "$PM_VERSION_MAJOR" -ge 5 ]; then
 	get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_PM5_VERSION" "NetherGamesMC" "ext-vanillagenerator"
