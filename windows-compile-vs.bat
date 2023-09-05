@@ -44,7 +44,7 @@ set PHP_VANILLAGENERATOR_PM4_VER=56fc48ea1367e1d08b228dfa580b513fbec8ca31
 set PHP_VANILLAGENERATOR_PM5_VER=2.1.3
 set PHP_LIBKAFKA_VER=6.0.3
 set PHP_ZSTD_VER=0.12.3
-SET PHP_GRPC_VER=1.57.0
+SET PHP_GRPC_VER=1.57.1
 
 set script_path=%~dp0
 set log_file=%script_path%compile.log
