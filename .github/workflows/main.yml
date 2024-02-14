@@ -196,7 +196,7 @@ jobs:
           path: ${{ github.workspace }}
 
       - name: Update latest branch release
-        uses: ncipollo/release-action@v1.13.0
+        uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
             ${{ github.workspace }}/Linux-PM4/Linux.zip
@@ -211,7 +211,7 @@ jobs:
           prerelease: ${{ endsWith(github.ref_name, '-preview') }}
 
       - name: Update latest branch release
-        uses: ncipollo/release-action@v1.13.0
+        uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
             ${{ github.workspace }}/Linux-PM5/Linux.zip
