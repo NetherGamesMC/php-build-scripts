@@ -1,31 +1,34 @@
 #!/usr/bin/env bash
-[ -z "$PHP_VERSION" ] && PHP_VERSION="8.3.4"
+PHP_VERSIONS=("8.2.25" "8.3.13")
+
+#### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
+#### Use commit hashes to avoid this.
 
 ZLIB_VERSION="1.3.1"
 GMP_VERSION="6.3.0"
-CURL_VERSION="curl-8_7_1"
+CURL_VERSION="curl-8_9_1"
 YAML_VERSION="0.2.5"
-LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff"
+LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
 LIBXML_VERSION="2.10.1" #2.10.2 requires automake 1.16.3, which isn't easily available on Ubuntu 20.04
 LIBPNG_VERSION="1.6.43"
 LIBJPEG_VERSION="9f"
-OPENSSL_VERSION="3.2.1"
+OPENSSL_VERSION="3.4.0"
 LIBZIP_VERSION="1.10.1"
 SQLITE3_VERSION="3450200" #3.45.2
-LIBDEFLATE_VERSION="275aa5141db6eda3587214e0f1d3a134768f557d" #1.20
+LIBDEFLATE_VERSION="2335c047e91cac6fd04cb0fd2769380395149f15" #1.22 - see above note about "v" prefixes
 LIBRDKAFKA_VER="2.1.1"
-LIBZSTD_VER="1.5.5"
+LIBZSTD_VER="1.5.6"
 LIBGRPC_VER="1.58.1"
 LIBSNAPPY_VER="1.2.1"
 SASL2_VERSION="2.1.28"
 
 EXT_PMMPTHREAD_VERSION="6.1.0"
-EXT_YAML_VERSION="2.2.3"
-EXT_LEVELDB_VERSION="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3"
+EXT_YAML_VERSION="2.2.4"
+EXT_LEVELDB_VERSION="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3" #release not tagged
 EXT_CHUNKUTILS2_VERSION="0.3.5"
-EXT_XDEBUG_VERSION="3.3.1"
-EXT_IGBINARY_VERSION="3.2.15"
-EXT_CRYPTO_VERSION="abbe7cbf869f96e69f2ce897271a61d32f43c7c0"
+EXT_XDEBUG_VERSION="3.3.2"
+EXT_IGBINARY_VERSION="3.2.16"
+EXT_CRYPTO_VERSION="abbe7cbf869f96e69f2ce897271a61d32f43c7c0" #release not tagged
 EXT_SNAPPY_VERSION="ab8b2b7375641f47deb21d8e8ba1a00ea5364cf6"
 EXT_RECURSIONGUARD_VERSION="0.1.0"
 EXT_LIBDEFLATE_VERSION="0.2.1"
@@ -34,7 +37,7 @@ EXT_XXHASH_VERSION="0.2.0"
 EXT_ARRAYDEBUG_VERSION="0.2.0"
 EXT_ENCODING_VERSION="0.3.0"
 EXT_RDKAFKA_VERSION="6.0.3"
-EXT_ZSTD_VERSION="0.13.0"
+EXT_ZSTD_VERSION="0.14.0"
 EXT_GRPC_VERSION="1.57.3"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
 
@@ -159,10 +162,12 @@ COMPILE_FFI="no"
 PM_VERSION_MAJOR=""
 
 DOWNLOAD_INSECURE="no"
-DOWNLOAD_CACHE=""
+DOWNLOAD_CACHE="$DIR/download_cache"
 SEPARATE_SYMBOLS="no"
 
-while getopts "::t:j:sdDFxfgnva:P:c:l:Ji" OPTION; do
+PHP_VERSION_BASE="auto"
+
+while getopts "::t:j:sdDFxfgnva:P:c:l:Jiz:" OPTION; do
 
 	case $OPTION in
 		l)
@@ -242,6 +247,9 @@ while getopts "::t:j:sdDFxfgnva:P:c:l:Ji" OPTION; do
 			write_out "WARNING" "This is a security risk, please only use this if you know what you are doing!"
 			DOWNLOAD_INSECURE="yes"
 			;;
+		z)
+			PHP_VERSION_BASE="$OPTARG"
+			;;
 		\?)
 			write_error "Invalid option: -$OPTARG"
 			exit 1
@@ -249,15 +257,57 @@ while getopts "::t:j:sdDFxfgnva:P:c:l:Ji" OPTION; do
 	esac
 done
 
-if [ "$PM_VERSION_MAJOR" == "" ]; then
-	write_error "Please specify PocketMine-MP major version target with -P (e.g. -P5)"
-	exit 1
-elif [ "$PM_VERSION_MAJOR" -lt 5 ]; then
-	write_error "PocketMine-MP 4.x and older are no longer supported"
+function php_version_id {
+	local PHP_VERSION="$1"
+	local PHP_VERSION_MAJOR=$(echo "$PHP_VERSION" | cut -d. -f1)
+	local PHP_VERSION_MINOR=$(echo "$PHP_VERSION" | cut -d. -f2)
+	#TODO: patch is a pain because of suffixes and we don't really need it anyway
+
+	# Use this for switching PHP version specific logic
+	local PHP_VERSION_ID=$(((PHP_VERSION_MAJOR * 10000) + (PHP_VERSION_MINOR * 100)))
+	echo "$PHP_VERSION_ID"
+}
+
+PREFERRED_PHP_VERSION_BASE=""
+case $PM_VERSION_MAJOR in
+	5)
+		PREFERRED_PHP_VERSION_BASE="8.2"
+		;;
+	"")
+		write_error "Please specify PocketMine-MP major version target with -P (e.g. -P5)"
+		exit 1
+		;;
+	\?)
+		write_error "PocketMine-MP $PM_VERSION_MAJOR is not supported by this version of the build script"
+		exit 1
+		;;
+esac
+
+write_out "opt" "Compiling with configuration for PocketMine-MP $PM_VERSION_MAJOR"
+
+if [ "$PHP_VERSION_BASE" == "auto" ]; then
+	PHP_VERSION_BASE="$PREFERRED_PHP_VERSION_BASE"
+elif [ "$PHP_VERSION_BASE" != "$PREFERRED_PHP_VERSION_BASE" ]; then
+	#TODO: validate that this PHP version is able to be used
+	write_out "WARNING" "$PHP_VERSION_BASE is not the default for PocketMine-MP $PM_VERSION_MAJOR"
+	write_out "WARNING" "The build may fail, or you may not be able to use the resulting PHP binary"
+fi
+
+for version in "${PHP_VERSIONS[@]}"; do
+	if [[ "$version" == "$PHP_VERSION_BASE."* ]]; then
+		PHP_VERSION="$version"
+		break
+	fi
+done
+
+if [ "$PHP_VERSION" == "" ]; then
+	write_error "Unsupported PHP base version $PHP_VERSION_BASE"
+	write_error "Example inputs: 8.2, 8.3"
 	exit 1
 fi
 
-write_out "opt" "Compiling with configuration for PocketMine-MP $PM_VERSION_MAJOR"
+PHP_VERSION_ID=$(php_version_id "$PHP_VERSION")
+write_out "opt" "Selected PHP $PHP_VERSION ($PHP_VERSION_ID)"
 
 #Needed to use aliases
 shopt -s expand_aliases
@@ -295,7 +345,9 @@ function download_file {
 			echo "Cache hit for URL: $url" >> "$DIR/install.log"
 		else
 			echo "Downloading file to cache: $url" >> "$DIR/install.log"
-			_download_file "$1" > "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
+			#download to a tmpfile first, so that we don't leave borked cache entries for later runs
+			_download_file "$1" > "$DOWNLOAD_CACHE/.temp" 2>> "$DIR/install.log"
+			mv "$DOWNLOAD_CACHE/.temp" "$DOWNLOAD_CACHE/$cached_filename" >> "$DIR/install.log" 2>&1
 		fi
 		cat "$DOWNLOAD_CACHE/$cached_filename" 2>> "$DIR/install.log"
 	else

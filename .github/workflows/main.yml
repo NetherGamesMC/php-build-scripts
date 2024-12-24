@@ -3,7 +3,7 @@ name: Build and publish PHP binaries
 on:
   push:
     branches: "**"
-    tags-ignore: "php-**"
+    tags-ignore: "**"
   pull_request:
   workflow_dispatch:
 
@@ -13,35 +13,31 @@ concurrency:
 
 jobs:
   all-builds:
-    name: PM${{ matrix.pm-version-major }}
+    name: PM${{ matrix.pm-version-major }} - PHP ${{ matrix.php-version-base }}
     strategy:
       matrix:
-        pm-version-major: [5]
+        include:
+          - pm-version-major: 5
+            php-version-base: "8.2"
+            special-release: default-latest #default = best for PM5, latest = display as latest on GitHub 
+          - pm-version-major: 5
+            php-version-base: "8.3"
 
     uses: ./.github/workflows/main-pm-matrix.yml
     with:
       pm-version-major: ${{ matrix.pm-version-major }}
+      php-version-base: ${{ matrix.php-version-base }}
+      special-release: ${{ matrix.special-release || 'none' }}
+      pm-preview: ${{ matrix.pm-preview || false }}
     secrets: inherit
 
-  publish:
-    name: Publish binaries
+  publish-archive-release:
+    name: Publish archive release
     needs: [all-builds]
     runs-on: ubuntu-20.04
-    if: ${{ startsWith(github.ref_name, 'php/') && github.ref_type == 'branch' && !contains(github.event.head_commit.message, '[no release]') }}
+    if: ${{ github.ref_name == 'stable' && github.ref_type == 'branch' && !contains(github.event.head_commit.message, '[no release]') }}
 
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set version information
-        id: version
-        run: |
-          echo PHP_VERSION=$(echo ${{ github.ref_name }} | cut -d / -f2) >> $GITHUB_OUTPUT
-          
-      - name: Update latest tag target
-        run: |
-          git tag -f php-${{ steps.version.outputs.PHP_VERSION }}-latest
-          git push -f origin php-${{ steps.version.outputs.PHP_VERSION }}-latest
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -49,53 +45,22 @@ jobs:
 
       - name: Generate release notes
         run: |
-          echo "Last updated on **$(date -u +'%Y-%m-%d at %H:%M:%S %Z')**" > changelog.md
-          echo -e "\n\n" >> changelog.md
           echo "Built by: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> changelog.md
-          if [[ "${{ github.ref_name }}" != "${{ github.event.repository.default_branch }}" ]]; then
-            echo -e "\n\n\n" >> changelog.md
-            if [[ "${{ github.ref_name }}" == *"preview" ]]; then
-              echo "# :warning: :radioactive: EXPERIMENTAL!!! :radioactive: :warning:" >> changelog.md
-              echo "### Your server and/or plugins may crash or misbehave with this release!" >> changelog.md
-              echo "### Consider downloading the [recommended release](${{ github.server_url }}/${{ github.repository }}/releases/latest) instead." >> changelog.md
-            else
-              echo ":warning: WARNING! :warning:" >> changelog.md
-              echo "Some plugins might not work properly on this version yet." >> changelog.md
-              echo "If you have problems, try the [recommended release](${{ github.server_url }}/${{ github.repository }}/releases/latest) instead." >> changelog.md
-            fi
-          else
-            echo ":white_check_mark: This version is recommended for production servers." >> changelog.md
-          fi
+          echo "Build number: ${{ github.run_number }}" >> changelog.md
           echo -e "\n\n\n" >> changelog.md
           echo ":information_source: **Linux/MacOS users**: Please see [this page](https://doc.pmmp.io/en/rtfd/faq/installation/opcache.so.html) to fix extension loading errors. Also, check out the [PocketMine-MP Linux/MacOS installer](https://doc.pmmp.io/en/rtfd/installation/get-dot-pmmp-dot-io.html)." >> changelog.md
+          echo ":warning: **Windows users**: Don't forget to install [Visual C++ Redistributable](https://aka.ms/vs/17/release/vc_redist.x64.exe) or the binary will not work!" >> changelog.md
+          echo -e "\n\n\n" >> changelog.md
 
-      - name: Update latest branch release
+      - name: Create release
         uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
-            ${{ github.workspace }}/Linux-PM*/*.tar.gz
-            ${{ github.workspace }}/MacOS-*-PM*/*.tar.gz
-            ${{ github.workspace }}/Windows-PM*/*.zip
-          makeLatest: ${{ github.ref_name == github.event.repository.default_branch }}
-          name: PHP ${{ steps.version.outputs.PHP_VERSION }} - Latest (Build ${{ github.run_number }})
-          tag: php-${{ steps.version.outputs.PHP_VERSION }}-latest
+            ${{ github.workspace }}/PHP-*-Linux-PM*/*.tar.gz
+            ${{ github.workspace }}/PHP-*-MacOS-*-PM*/*.tar.gz
+            ${{ github.workspace }}/PHP-*-Windows-PM*/*.zip
+          name: PHP (Build ${{ github.run_number }}) - Archive
+          tag: php-build-${{ github.run_number }}
           commit: ${{ github.sha }}
-          allowUpdates: true
+          allowUpdates: false
           bodyFile: ${{ github.workspace }}/changelog.md
-          removeArtifacts: true
-          prerelease: ${{ endsWith(github.ref_name, '-preview') }}
-
-      - name: Publish unique release
-        uses: ncipollo/release-action@v1.14.0
-        with:
-          artifacts: |
-            ${{ github.workspace }}/Linux-PM*/*.tar.gz
-            ${{ github.workspace }}/MacOS-*-PM*/*.tar.gz
-            ${{ github.workspace }}/Windows-PM*/*.zip
-          makeLatest: false
-          name: PHP ${{ steps.version.outputs.PHP_VERSION }} (Build ${{ github.run_number }})
-          tag: php-${{ steps.version.outputs.PHP_VERSION }}-build-${{ github.run_number }}
-          commit: ${{ github.sha }}
-          bodyFile: ${{ github.workspace }}/changelog.md
-          prerelease: ${{ endsWith(github.ref_name, '-preview') }}
-   
