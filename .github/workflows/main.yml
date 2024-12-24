@@ -18,10 +18,8 @@ jobs:
       matrix:
         include:
           - pm-version-major: 5
-            php-version-base: "8.2"
-            special-release: default-latest #default = best for PM5, latest = display as latest on GitHub 
-          - pm-version-major: 5
             php-version-base: "8.3"
+            special-release: default-latest #default = best for PM5, latest = display as latest on GitHub
 
     uses: ./.github/workflows/main-pm-matrix.yml
     with:

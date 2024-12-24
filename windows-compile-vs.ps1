@@ -13,6 +13,10 @@ $LIBYAML_VER="0.2.5"
 $PTHREAD_W32_VER="3.0.0"
 $LEVELDB_MCPE_VER="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
 $LIBDEFLATE_VER="2335c047e91cac6fd04cb0fd2769380395149f15" #1.22 - see above note about "v" prefixes
+$LIBRDKAFKA_VER="2.1.1"
+$LIBZSTD_VER="1.5.6"
+$LIBGRPC_VER="1.56.2"
+$LIBSNAPPY_VER="1.2.1"
 
 $PHP_PMMPTHREAD_VER="6.1.0"
 $PHP_YAML_VER="2.2.4"
@@ -20,6 +24,7 @@ $PHP_CHUNKUTILS2_VER="0.3.5"
 $PHP_IGBINARY_VER="3.2.16"
 $PHP_LEVELDB_VER="317fdcd8415e1566fc2835ce2bdb8e19b890f9f3" #release not tagged
 $PHP_CRYPTO_VER="abbe7cbf869f96e69f2ce897271a61d32f43c7c0" #release not tagged
+$PHP_SNAPPY_VER="ab8b2b7375641f47deb21d8e8ba1a00ea5364cf6"
 $PHP_RECURSIONGUARD_VER="0.1.0"
 $PHP_MORTON_VER="0.1.2"
 $PHP_LIBDEFLATE_VER="0.2.1"
@@ -27,6 +32,10 @@ $PHP_XXHASH_VER="0.2.0"
 $PHP_XDEBUG_VER="3.3.2"
 $PHP_ARRAYDEBUG_VER="0.2.0"
 $PHP_ENCODING_VER="0.3.0"
+$PHP_VANILLAGENERATOR_VER="2.1.7"
+$PHP_LIBKAFKA_VER="6.0.3"
+$PHP_ZSTD_VER="0.13.0"
+$PHP_GRPC_VER="1.57.3"
 
 function pm-echo {
     param ([string] $message)
@@ -294,6 +303,130 @@ function download-php-deps {
     write-done
 }
 
+function build-snappy {
+    write-library "snappy" $LIBSNAPPY_VER
+    write-download
+    (& cmd.exe /c "git clone -b $LIBSNAPPY_VER https://github.com/google/snappy $pwd 2>&1") >> $log_file
+    Push-Location snappy
+
+    (& cmd.exe /c "git submodule update --depth=1 --init 2>&1") >> $log_file
+
+    write-configure
+    sdk-command "cmake -GNinja^`
+        -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
+        -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
+        -DCMAKE_BUILD_TYPE=`"$MSBUILD_CONFIGURATION`"^`
+        `"$pwd`" || exit 1"
+
+    write-compile
+    sdk-command "cmake --build . || exit 1"
+    write-install
+    sdk-command "cmake -P cmake_install.cmake || exit 1"
+    write-done
+    Pop-Location
+}
+
+function build-grpc {
+    write-library "grpc" $LIBGRPC_VER
+    write-download
+    (& cmd.exe /c "git clone -b v$LIBGRPC_VER --depth=1 https://github.com/grpc/grpc $pwd 2>&1") >> $log_file
+    Push-Location grpc
+
+    (& cmd.exe /c "git submodule update --depth=1 --init 2>&1") >> $log_file
+
+    write-configure
+    sdk-command "cmake -GNinja^
+        -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
+        -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
+        -DCMAKE_BUILD_TYPE=`"$MSBUILD_CONFIGURATION`"^`
+        -DZLIB_LIBRARY=`"$DEPS_DIR\lib\zlib_a.lib`"^`
+        -DgRPC_BUILD_CSHARP_EXT=OFF^`
+        -DgRPC_BUILD_GRPC_CSHARP_PLUGIN=OFF^`
+        -DgRPC_BUILD_GRPC_NODE_PLUGIN=OFF^`
+        -DgRPC_BUILD_GRPC_OBJECTIVE_C_PLUGIN=OFF^`
+        -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF^`
+        -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF^`
+        -DgRPC_SSL_PROVIDER=`"package`"^`
+        -DgRPC_ZLIB_PROVIDER=`"package`"
+        `"$pwd`" || exit 1"
+
+    write-compile
+    sdk-command "cmake --build . || exit 1"
+    write-install
+    sdk-command "cmake -P cmake_install.cmake || exit 1"
+
+    Move-Item ".\third_party\protobuf\php\ext\google\protobuf" "$SOURCES_PATH\php-src\ext\protobuf" >> $log_file 2>&1
+    Move-Item ".\third_party\protobuf\third_party" "$SOURCES_PATH\php-src\\ext\protobuf\third_party" >> $log_file 2>&1
+
+@"
+ARG_ENABLE("protobuf", "Enable Protobuf extension", "yes");
+
+if (PHP_PROTOBUF != "no") {
+  EXTENSION("protobuf", "arena.c array.c convert.c def.c map.c message.c names.c php-upb.c protobuf.c", PHP_PROTOBUF_SHARED, "");
+
+  ADD_SOURCES(configure_module_dirname + "/third_party/utf8_range", "naive.c range2-neon.c range2-sse.c", "protobuf");
+
+  AC_DEFINE('HAVE_PROTOBUF', 1, '');
+}
+"@ | Out-File -Encoding UTF8 -FilePath $SOURCES_PATH\php-src\ext\protobuf\config.w32
+
+    write-done
+    Pop-Location
+}
+
+function build-zstd {
+    write-library "zstd" $LIBZSTD_VER
+    write-download
+    $file = download-file "https://github.com/facebook/zstd/archive/v$LIBZSTD_VER.zip" "zstd"
+    write-extracting
+    unzip-file $file $pwd
+    Move-Item "zstd-$LIBYAML_VER" libyaml >> $log_file 2>&1
+    Push-Location libyaml
+
+    write-configure
+    sdk-command "cmake -G `"$CMAKE_TARGET`" -A `"$ARCH`"^`
+        -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
+        -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
+        -DBUILD_SHARED_LIBS=ON^`
+        `"$pwd`" || exit 1"
+    write-compile
+    sdk-command "msbuild ALL_BUILD.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+    write-install
+    sdk-command "msbuild INSTALL.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+    write-done
+    Pop-Location
+}
+
+function build_rdkafka {
+    write-library "librdkafka" $LIBRDKAFKA_VER
+    write-download
+    $file = download-file "https://github.com/confluentinc/librdkafka/archive/v$LIBRDKAFKA_VER.zip" "librdkafka"
+    write-extracting
+    unzip-file $file $pwd
+    Move-Item "librdkafka-$LIBRDKAFKA_VER" librdkafka >> $log_file 2>&1
+    Push-Location librdkafka
+
+    write-configure
+    sdk-command "cmake -G `"$CMAKE_TARGET`" -A `"$ARCH`"^`
+        -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
+        -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
+        -DBUILD_SHARED_LIBS=ON^`
+        `"$pwd`" || exit 1"
+
+    write-compile
+    sdk-command "msbuild ALL_BUILD.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+    write-install
+    sdk-command "msbuild INSTALL.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+
+    # for no reason, php-rdkafka check for librdkafka and not rdkafka
+    # move them to the appropriate location for php-rdkafka compatibility.
+    Move-Item "$DEPS_DIR\lib\rdkafka.lib" "$DEPS_DIR\lib\librdkafka.lib" >> $log_file 2>&1
+    Move-Item "$DEPS_DIR\lib\rdkafka++.lib" "$DEPS_DIR\lib\librdkafka++.lib" >> $log_file 2>&1
+
+    write-done
+    Pop-Location
+}
+
 function build-yaml {
     write-library "yaml" $LIBYAML_VER
     write-download
@@ -427,6 +560,7 @@ function get-github-extension {
 function download-php-extensions {
     Push-Location "$SOURCES_PATH\php-src\ext" >> $log_file 2>&1
     get-github-extension "pmmpthread" $PHP_PMMPTHREAD_VER "pmmp" "ext-pmmpthread"
+    get-github-extension "vanillagenerator"      $PHP_VANILLAGENERATOR_VER      "NetherGamesMC" "ext-vanillagenerator"
     get-github-extension "yaml"                  $PHP_YAML_VER                  "php"      "pecl-file_formats-yaml"
     get-github-extension "chunkutils2"           $PHP_CHUNKUTILS2_VER           "pmmp"     "ext-chunkutils2"
     get-github-extension "igbinary"              $PHP_IGBINARY_VER              "igbinary" "igbinary"
@@ -438,6 +572,9 @@ function download-php-extensions {
     get-github-extension "xdebug"                $PHP_XDEBUG_VER                "xdebug"   "xdebug"
     get-github-extension "arraydebug"            $PHP_ARRAYDEBUG_VER            "pmmp"     "ext-arraydebug"
     get-github-extension "encoding"              $PHP_ENCODING_VER              "pmmp"     "ext-encoding"
+    get-github-extension "rdkafka"               $PHP_LIBKAFKA_VER              "arnaud-lb" "php-rdkafka"
+    get-github-extension "zstd"                  $PHP_ZSTD_VER                  "kjdev"     "php-ext-zstd"
+    get-github-extension "grpc"                  $PHP_GRPC_VER                  "larryTheCoder" "php-grpc"
 
     write-library "php-ext crypto" $PHP_CRYPTO_VER
     write-download
@@ -446,6 +583,19 @@ function download-php-extensions {
     write-status "preparing"
     (& cmd.exe /c "git checkout $PHP_CRYPTO_VER 2>&1") >> $log_file
     (& cmd.exe /c "git submodule update --init --recursive 2>&1") >> $log_file
+    write-done
+    Pop-Location
+
+    write-library "php-ext snappy" $PHP_SNAPPY_VER
+    write-download
+    (& cmd.exe /c "git clone https://github.com/kjdev/php-ext-snappy.git snappy 2>&1") >> $log_file
+    Push-Location snappy
+    write-status "preparing"
+    (& cmd.exe /c "git checkout $PHP_SNAPPY_VER 2>&1") >> $log_file
+    (& cmd.exe /c "git submodule update --init --recursive 2>&1") >> $log_file
+    Push-Location snappy
+    (& cmd.exe /c "git checkout $LIBSNAPPY_VER 2>&1") >> $log_file
+    Pop-Location
     write-done
     Pop-Location
 
@@ -470,6 +620,10 @@ mkdir $LIB_BUILD_DIR >> $log_file 2>&1
 
 cd $LIB_BUILD_DIR >> $log_file 2>&1
 
+build-snappy
+build-grpc
+build-zstd
+build_rdkafka
 build-pthreads4w
 build-yaml
 #these two both need zlib from the standard deps
@@ -512,6 +666,11 @@ sdk-command "configure^`
     --enable-opcache^`
     --enable-opcache-jit=$PHP_JIT_ENABLE_ARG^`
     --enable-phar^`
+    --enable-vanillagenerator=shared^
+    --enable-zstd^
+    --enable-snappy^
+    --enable-grpc=shared^
+    --enable-protobuf=shared^
     --enable-recursionguard=shared^`
     --enable-sockets^`
     --enable-tokenizer^`
@@ -524,6 +683,7 @@ sdk-command "configure^`
     --with-crypto=shared^`
     --with-curl^`
     --with-dom^`
+    --with-ffi^`
     --with-gd=shared^`
     --with-gmp^`
     --with-iconv^`
@@ -543,6 +703,7 @@ sdk-command "configure^`
     --with-xdebug-compression^`
     --with-xml^`
     --with-yaml^`
+    --with-rdkafka=shared^`
     --with-pdo-mysql^`
     --with-pdo-sqlite^`
     --without-readline"
@@ -559,6 +720,9 @@ Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\icu*.dl
 Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\glib-*.dll" >> $log_file 2>&1
 Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\gmodule-*.dll" >> $log_file 2>&1
 Remove-Item -Recurse "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\lib\enchant\" >> $log_file 2>&1
+
+Move-Item "$DEPS_DIR\grpc\cmake\build\grpc_php_plugin.exe" "$outpath\grpc\grpc_php_plugin.exe" >> $log_file 2>&1
+Move-Item "$DEPS_DIR\grpc\cmake\build\third_party\protobuf\protoc.exe" "$outpath\grpc\protoc.exe" >> $log_file 2>&1
 
 cd $outpath >> $log_file 2>&1
 Move-Item -Force "$SOURCES_PATH\php-src\$ARCH\$($OUT_PATH_REL)_TS\php-debug-pack-*.zip" $outpath
@@ -603,6 +767,10 @@ append-file-utf8 "opcache.cache_id=PHP_BINARY ;prevent sharing SHM between diffe
 append-file-utf8 ";Optional extensions, supplied for plugin use" $php_ini
 append-file-utf8 "extension=php_fileinfo.dll" $php_ini
 append-file-utf8 "extension=php_gd.dll" $php_ini
+append-file-utf8 "extension=php_grpc.dll" $php_ini
+append-file-utf8 "extension=php_protobuf.dll" $php_ini
+append-file-utf8 "extension=php_vanillagenerator.dll" $php_ini
+append-file-utf8 "extension=php_rdkafka.dll" $php_ini
 append-file-utf8 "extension=php_mysqli.dll" $php_ini
 append-file-utf8 "extension=php_sqlite3.dll" $php_ini
 append-file-utf8 ";Optional extensions, supplied for debugging" $php_ini
