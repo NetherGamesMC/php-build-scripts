@@ -53,6 +53,7 @@ jobs:
           restore-keys: musl-cross-make-
 
       - name: Checkout musl-cross-make
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
         uses: actions/checkout@v4
         with:
           repository: pmmp/musl-cross-make
@@ -60,6 +61,7 @@ jobs:
           ref: ${{ env.MUSL_CROSS_MAKE_VERSION }}
 
       - name: Build compiler
+        if: steps.compiler-cache.outputs.cache-hit != 'true'
         working-directory: musl-cross-make
         run: |
           echo "TARGET = aarch64-linux-musl" > config.mak
@@ -80,7 +82,7 @@ jobs:
       - name: Create tarball
         run: |
           tar -czf ./PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}.tar.gz bin
-          tar -czf ./PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
+          tar -czf ./Z-PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -88,7 +90,7 @@ jobs:
         with:
           name: PHP-${{ inputs.php-version-base }}-Android-PM${{ inputs.pm-version-major }}
           path: |
-            ./PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}*.tar.gz
+            ./*PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}*.tar.gz
             install.log
             compile.sh
           if-no-files-found: error
@@ -136,7 +138,7 @@ jobs:
       - name: Create tarball
         run: |
           tar -czf ./PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}.tar.gz bin
-          tar -czf ./PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
+          tar -czf ./Z-PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -144,7 +146,7 @@ jobs:
         with:
           name: PHP-${{ inputs.php-version-base }}-Linux-PM${{ inputs.pm-version-major }}
           path: |
-            ./PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}*.tar.gz
+            ./*PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}*.tar.gz
             install.log
             compile.sh
           if-no-files-found: error
@@ -202,7 +204,7 @@ jobs:
       - name: Create tarball
         run: |
           tar -czf ./PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name }}-PM${{ inputs.pm-version-major }}.tar.gz bin
-          tar -czf ./PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name }}-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
+          tar -czf ./Z-PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name }}-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
         
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -210,7 +212,7 @@ jobs:
         with:
           name: PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name }}-PM${{ inputs.pm-version-major }}
           path: |
-            ./PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name}}-PM${{ inputs.pm-version-major }}*.tar.gz
+            ./*PHP-${{ inputs.php-version-base }}-MacOS-${{ matrix.artifact-name}}-PM${{ inputs.pm-version-major }}*.tar.gz
             install.log
             compile.sh
           if-no-files-found: error
@@ -254,7 +256,7 @@ jobs:
         run: |
           mkdir temp
           Compress-Archive -Path .\bin -DestinationPath "PHP-${{ inputs.php-version-base }}-Windows-x64-PM${{ inputs.pm-version-major }}.zip"
-          move php-debug-pack-*.zip temp/PHP-${{ inputs.php-version-base }}-Windows-x64-PM${{ inputs.pm-version-major }}-debugging-symbols.zip
+          move php-debug-pack-*.zip temp/Z-PHP-${{ inputs.php-version-base }}-Windows-x64-PM${{ inputs.pm-version-major }}-debugging-symbols.zip
           move temp\*.zip .
 
       - name: Upload artifacts
@@ -263,7 +265,7 @@ jobs:
         with:
           name: PHP-${{ inputs.php-version-base }}-Windows-PM${{ inputs.pm-version-major }}
           path: |
-            PHP-${{ inputs.php-version-base }}-Windows-x64-PM${{ inputs.pm-version-major }}*.zip
+            *PHP-${{ inputs.php-version-base }}-Windows-x64-PM${{ inputs.pm-version-major }}*.zip
             compile.log
             windows-compile-vs.bat
           if-no-files-found: error
@@ -290,7 +292,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: ${{ github.workspace }}
-          pattern: "PHP-${{ inputs.php-version-base }}-*-PM${{ inputs.pm-version-major }}"
+          pattern: "*PHP-${{ inputs.php-version-base }}-*-PM${{ inputs.pm-version-major }}"
+
+      - name: Download .gdbinit for this PHP version
+        run: |
+          curl -L https://raw.githubusercontent.com/php/php-src/refs/heads/PHP-${{ inputs.php-version-base }}/.gdbinit -o Z-PHP-${{ inputs.php-version-base }}.gdbinit
+
+      - name: Upload .gdbinit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PHP-${{ inputs.php-version-base }}.gdbinit
+          path: |
+            ${{ github.workspace }}/*.gdbinit
 
       - name: Generate release notes
         run: |
@@ -322,8 +335,9 @@ jobs:
         if: ${{ inputs.special-release != 'none' }}
         with:
           artifacts: |
-            ${{ github.workspace }}/PHP-*-PM*/*.tar.gz
-            ${{ github.workspace }}/PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*PHP-*-PM*/*.tar.gz
+            ${{ github.workspace }}/*PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*.gdbinit
           name: PM ${{ inputs.pm-version-major }}.x (${{ steps.date.outputs.DATE }}) - Recommended
           tag: pm${{ inputs.pm-version-major }}-latest
           commit: ${{ github.sha }}
@@ -337,8 +351,9 @@ jobs:
         uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
-            ${{ github.workspace }}/PHP-*-PM*/*.tar.gz
-            ${{ github.workspace }}/PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*PHP-*-PM*/*.tar.gz
+            ${{ github.workspace }}/*PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*.gdbinit
           name: PM ${{ inputs.pm-version-major }}.x (${{ steps.date.outputs.DATE }}) - PHP ${{ inputs.php-version-base }}
           tag: pm${{ inputs.pm-version-major }}-php-${{ inputs.php-version-base }}-latest
           commit: ${{ github.sha }}

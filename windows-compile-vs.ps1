@@ -12,7 +12,7 @@ $ARCH="x64"
 $LIBYAML_VER="0.2.5"
 $PTHREAD_W32_VER="3.0.0"
 $LEVELDB_MCPE_VER="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
-$LIBDEFLATE_VER="2335c047e91cac6fd04cb0fd2769380395149f15" #1.22 - see above note about "v" prefixes
+$LIBDEFLATE_VER="78051988f96dc8d8916310d8b24021f01bd9e102" #1.23 - see above note about "v" prefixes
 $LIBRDKAFKA_VER="2.1.1"
 $LIBZSTD_VER="1.5.6"
 $LIBGRPC_VER="1.56.2"
@@ -31,7 +31,7 @@ $PHP_LIBDEFLATE_VER="0.2.1"
 $PHP_XXHASH_VER="0.2.0"
 $PHP_XDEBUG_VER="3.3.2"
 $PHP_ARRAYDEBUG_VER="0.2.0"
-$PHP_ENCODING_VER="0.3.0"
+$PHP_ENCODING_VER="0.4.0"
 $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.3"
 $PHP_ZSTD_VER="0.13.0"
@@ -778,9 +778,9 @@ append-file-utf8 "extension=php_recursionguard.dll" $php_ini
 append-file-utf8 "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" $php_ini
 append-file-utf8 ";extension=php_arraydebug.dll" $php_ini
 append-file-utf8 "" $php_ini
-if ($PHP_JIT_ENABLE_ARG -eq "on") {
+if ($PHP_JIT_ENABLE_ARG -eq "yes") {
     append-file-utf8 "; ---- ! WARNING ! ----" $php_ini
-    append-file-utf8 "; JIT can provide big performance improvements, but as of PHP %PHP_VER% it is still unstable. For this reason, it is disabled by default." $php_ini
+    append-file-utf8 "; JIT can provide big performance improvements, but as of PHP $PHP_VER it is still unstable. For this reason, it is disabled by default." $php_ini
     append-file-utf8 "; Enable it at your own risk. See https://www.php.net/manual/en/opcache.configuration.php#ini.opcache.jit for possible options." $php_ini
     append-file-utf8 "opcache.jit=off" $php_ini
     append-file-utf8 "opcache.jit_buffer_size=128M" $php_ini

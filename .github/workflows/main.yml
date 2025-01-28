@@ -54,9 +54,10 @@ jobs:
         uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: |
-            ${{ github.workspace }}/PHP-*-Linux-PM*/*.tar.gz
-            ${{ github.workspace }}/PHP-*-MacOS-*-PM*/*.tar.gz
-            ${{ github.workspace }}/PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*PHP-*-PM*/*.tar.gz
+            ${{ github.workspace }}/*PHP-*-Windows-PM*/*.zip
+            ${{ github.workspace }}/*PHP-*.gdbinit/*.gdbinit
+
           name: PHP (Build ${{ github.run_number }}) - Archive
           tag: php-build-${{ github.run_number }}
           commit: ${{ github.sha }}
