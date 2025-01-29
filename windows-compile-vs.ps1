@@ -306,7 +306,7 @@ function download-php-deps {
 function build-snappy {
     write-library "snappy" $LIBSNAPPY_VER
     write-download
-    (& cmd.exe /c "git clone -b $LIBSNAPPY_VER https://github.com/google/snappy $pwd 2>&1") >> $log_file
+    (& cmd.exe /c "git clone -b $LIBSNAPPY_VER https://github.com/google/snappy snappy 2>&1") >> $log_file
     Push-Location snappy
 
     (& cmd.exe /c "git submodule update --depth=1 --init 2>&1") >> $log_file
@@ -316,7 +316,7 @@ function build-snappy {
         -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
         -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
         -DCMAKE_BUILD_TYPE=`"$MSBUILD_CONFIGURATION`"^`
-        `"$pwd`" || exit 1"
+        . || exit 1"
 
     write-compile
     sdk-command "cmake --build . || exit 1"
@@ -329,7 +329,7 @@ function build-snappy {
 function build-grpc {
     write-library "grpc" $LIBGRPC_VER
     write-download
-    (& cmd.exe /c "git clone -b v$LIBGRPC_VER --depth=1 https://github.com/grpc/grpc $pwd 2>&1") >> $log_file
+    (& cmd.exe /c "git clone -b v$LIBGRPC_VER --depth=1 https://github.com/grpc/grpc grpc 2>&1") >> $log_file
     Push-Location grpc
 
     (& cmd.exe /c "git submodule update --depth=1 --init 2>&1") >> $log_file
@@ -347,16 +347,16 @@ function build-grpc {
         -DgRPC_BUILD_GRPC_PYTHON_PLUGIN=OFF^`
         -DgRPC_BUILD_GRPC_RUBY_PLUGIN=OFF^`
         -DgRPC_SSL_PROVIDER=`"package`"^`
-        -DgRPC_ZLIB_PROVIDER=`"package`"
-        `"$pwd`" || exit 1"
+        -DgRPC_ZLIB_PROVIDER=`"package`"^`
+        . || exit 1"
 
     write-compile
     sdk-command "cmake --build . || exit 1"
     write-install
     sdk-command "cmake -P cmake_install.cmake || exit 1"
 
-    Move-Item ".\third_party\protobuf\php\ext\google\protobuf" "$SOURCES_PATH\php-src\ext\protobuf" >> $log_file 2>&1
-    Move-Item ".\third_party\protobuf\third_party" "$SOURCES_PATH\php-src\\ext\protobuf\third_party" >> $log_file 2>&1
+    Move-Item "third_party\protobuf\php\ext\google\protobuf" "$SOURCES_PATH\php-src\ext\protobuf" >> $log_file 2>&1
+    Move-Item "third_party\protobuf\third_party" "$SOURCES_PATH\php-src\ext\protobuf\third_party" >> $log_file 2>&1
 
 @"
 ARG_ENABLE("protobuf", "Enable Protobuf extension", "yes");
@@ -368,7 +368,7 @@ if (PHP_PROTOBUF != "no") {
 
   AC_DEFINE('HAVE_PROTOBUF', 1, '');
 }
-"@ | Out-File -Encoding UTF8 -FilePath $SOURCES_PATH\php-src\ext\protobuf\config.w32
+"@ | Out-File -Encoding ascii -FilePath $SOURCES_PATH\php-src\ext\protobuf\config.w32
 
     write-done
     Pop-Location
@@ -380,15 +380,15 @@ function build-zstd {
     $file = download-file "https://github.com/facebook/zstd/archive/v$LIBZSTD_VER.zip" "zstd"
     write-extracting
     unzip-file $file $pwd
-    Move-Item "zstd-$LIBYAML_VER" libyaml >> $log_file 2>&1
-    Push-Location libyaml
+    Move-Item "zstd-$LIBZSTD_VER" libzstd >> $log_file 2>&1
+    Push-Location libzstd
 
     write-configure
     sdk-command "cmake -G `"$CMAKE_TARGET`" -A `"$ARCH`"^`
         -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
         -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
         -DBUILD_SHARED_LIBS=ON^`
-        `"$pwd`" || exit 1"
+        `"$pwd\build\cmake`" || exit 1"
     write-compile
     sdk-command "msbuild ALL_BUILD.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
     write-install
@@ -411,6 +411,10 @@ function build_rdkafka {
         -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
         -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
         -DBUILD_SHARED_LIBS=ON^`
+        -DWITH_ZSTD=ON^`
+        -DWITH_SSL=ON^`
+        -DWITH_CURL=OFF^`
+        -DENABLE_LZ4_EXT=OFF^`
         `"$pwd`" || exit 1"
 
     write-compile
@@ -576,6 +580,11 @@ function download-php-extensions {
     get-github-extension "zstd"                  $PHP_ZSTD_VER                  "kjdev"     "php-ext-zstd"
     get-github-extension "grpc"                  $PHP_GRPC_VER                  "larryTheCoder" "php-grpc"
 
+    # Vanilla generator depend on this folder, the compiler will not be able
+    # to find these dependencies if the folder name were to change
+    Move-Item "ext-chunkutils2-$PHP_CHUNKUTILS2_VER" "chunkutils2" -Force
+    Move-Item "ext-morton-$PHP_MORTON_VER" "morton" -Force
+
     write-library "php-ext crypto" $PHP_CRYPTO_VER
     write-download
     (& cmd.exe /c "git clone https://github.com/bukka/php-crypto.git crypto 2>&1") >> $log_file
@@ -613,6 +622,7 @@ $DEPS_DIR="$SOURCES_PATH\deps"
 #custom libs depend on some standard libs, so prepare these first
 #a bit annoying because this part of the build is slow and makes it take longer to find problems
 download-php-deps
+download-php
 
 $LIB_BUILD_DIR="$SOURCES_PATH\deps_build"
 
@@ -632,7 +642,6 @@ build-libdeflate
 
 cd $SOURCES_PATH >> $log_file 2>&1
 
-download-php
 download-php-extensions
 
 cd "$SOURCES_PATH\php-src"
@@ -666,11 +675,11 @@ sdk-command "configure^`
     --enable-opcache^`
     --enable-opcache-jit=$PHP_JIT_ENABLE_ARG^`
     --enable-phar^`
-    --enable-vanillagenerator=shared^
-    --enable-zstd^
-    --enable-snappy^
-    --enable-grpc=shared^
-    --enable-protobuf=shared^
+    --enable-vanillagenerator=shared^`
+    --enable-zstd^`
+    --enable-snappy^`
+    --enable-grpc=shared^`
+    --enable-protobuf=shared^`
     --enable-recursionguard=shared^`
     --enable-sockets^`
     --enable-tokenizer^`
@@ -721,8 +730,9 @@ Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\glib-*.
 Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\gmodule-*.dll" >> $log_file 2>&1
 Remove-Item -Recurse "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\lib\enchant\" >> $log_file 2>&1
 
-Move-Item "$DEPS_DIR\grpc\cmake\build\grpc_php_plugin.exe" "$outpath\grpc\grpc_php_plugin.exe" >> $log_file 2>&1
-Move-Item "$DEPS_DIR\grpc\cmake\build\third_party\protobuf\protoc.exe" "$outpath\grpc\protoc.exe" >> $log_file 2>&1
+mkdir "$outpath\bin\grpc" >> $log_file 2>&1
+Move-Item "$LIB_BUILD_DIR\grpc\grpc_php_plugin.exe" "$outpath\bin\grpc\grpc_php_plugin.exe" >> $log_file 2>&1
+Move-Item "$LIB_BUILD_DIR\grpc\third_party\protobuf\protoc.exe" "$outpath\bin\grpc\protoc.exe" >> $log_file 2>&1
 
 cd $outpath >> $log_file 2>&1
 Move-Item -Force "$SOURCES_PATH\php-src\$ARCH\$($OUT_PATH_REL)_TS\php-debug-pack-*.zip" $outpath
