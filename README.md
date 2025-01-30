@@ -43,6 +43,7 @@ Bash script used to compile PHP on MacOS and Linux platforms. Make sure you have
 | -d           | Compiles with debugging symbols and disables optimizations (slow, but useful for debugging segfaults)       |
 | -D           | Compiles with separated debugging symbols, but leaves optimizations enabled (used for distributed binaries) |
 | -g           | Will compile GD2                                                                                            |
+| -F           | Will compile FFI                                                                                            |
 | -j           | Set make threads to #                                                                                       |
 | -l           | Uses the folder specified for caching compilation artifacts (useful for rapid rebuild and testing)          |
 | -n           | Don't remove sources after completing compilation                                                           |
