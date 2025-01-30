@@ -20,95 +20,7 @@ on:
         required: true
         type: boolean
 
-env:
-  MUSL_CROSS_MAKE_VERSION: 7b9487e56efc83c419a397af7df7f119001dc51c
-
 jobs:
-  android:
-    name: Android arm64
-    runs-on: ubuntu-20.04
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install tools and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install make autoconf automake libtool libtool-bin m4 wget libc-bin gzip bzip2 bison g++ git re2c
-          cmake --version
-
-      - name: Prepare compile.sh download cache
-        id: download-cache
-        uses: actions/cache@v4
-        with:
-          path: ./download_cache
-          key: compile-sh-cache-ssl-https-${{ hashFiles('./compile.sh') }}
-          restore-keys: compile-sh-cache-ssl-https-
-
-      - name: Fetch compiler cache
-        id: compiler-cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ github.workspace }}/compiler
-          key: musl-cross-make-${{ env.MUSL_CROSS_MAKE_VERSION }}
-          restore-keys: musl-cross-make-
-
-      - name: Checkout musl-cross-make
-        if: steps.compiler-cache.outputs.cache-hit != 'true'
-        uses: actions/checkout@v4
-        with:
-          repository: pmmp/musl-cross-make
-          path: musl-cross-make
-          ref: ${{ env.MUSL_CROSS_MAKE_VERSION }}
-
-      - name: Build compiler
-        if: steps.compiler-cache.outputs.cache-hit != 'true'
-        working-directory: musl-cross-make
-        run: |
-          echo "TARGET = aarch64-linux-musl" > config.mak
-          make -j$(nproc)
-          make install
-          mv ./output "${{ github.workspace }}/compiler"
-
-      - name: Compile PHP
-        run: |
-          export PATH="${{ github.workspace }}/compiler/bin:$PATH"
-
-          # Used "set -ex" instead of hashbang since script isn't executed with hashbang
-          set -ex
-          trap "exit 1" ERR
-          ./compile.sh -t android-aarch64 -x -j 4 -g -F -P ${{ inputs.pm-version-major }} -c ./download_cache -D -z ${{ inputs.php-version-base }}
-        
-      
-      - name: Create tarball
-        run: |
-          tar -czf ./PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}.tar.gz bin
-          tar -czf ./Z-PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: PHP-${{ inputs.php-version-base }}-Android-PM${{ inputs.pm-version-major }}
-          path: |
-            ./*PHP-${{ inputs.php-version-base }}-Android-arm64-PM${{ inputs.pm-version-major }}*.tar.gz
-            install.log
-            compile.sh
-          if-no-files-found: error
-
-      - name: Prepare workspace for upload
-        if: failure()
-        run: tar -czf workspace.tar.gz install_data
-
-      - name: Upload workspace
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: PHP-${{ inputs.php-version-base }}-Android-workspace-PM${{ inputs.pm-version-major }}
-          path: |
-            workspace.tar.gz
-          if-no-files-found: error
-
   linux:
     name: Linux
     runs-on: ubuntu-20.04
@@ -274,7 +186,7 @@ jobs:
 
   publish:
     name: Publish binaries
-    needs: [linux, macos, windows, android]
+    needs: [linux, macos, windows]
     runs-on: ubuntu-20.04
     if: ${{ github.ref_name == 'stable' && github.ref_type == 'branch' && !contains(github.event.head_commit.message, '[no release]') }}
     concurrency: release-${{ inputs.php-version-base }}-pm${{ inputs.pm-version-major }}
