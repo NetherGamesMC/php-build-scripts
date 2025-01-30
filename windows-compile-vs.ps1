@@ -730,15 +730,15 @@ Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\glib-*.
 Remove-Item "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\gmodule-*.dll" >> $log_file 2>&1
 Remove-Item -Recurse "$SOURCES_PATH\php-src\$ARCH\Release_TS\php-$PHP_DISPLAY_VER\lib\enchant\" >> $log_file 2>&1
 
-mkdir "$outpath\bin\grpc" >> $log_file 2>&1
-Move-Item "$LIB_BUILD_DIR\grpc\grpc_php_plugin.exe" "$outpath\bin\grpc\grpc_php_plugin.exe" >> $log_file 2>&1
-Move-Item "$LIB_BUILD_DIR\grpc\third_party\protobuf\protoc.exe" "$outpath\bin\grpc\protoc.exe" >> $log_file 2>&1
-
 cd $outpath >> $log_file 2>&1
 Move-Item -Force "$SOURCES_PATH\php-src\$ARCH\$($OUT_PATH_REL)_TS\php-debug-pack-*.zip" $outpath
 Remove-Item -Recurse bin -ErrorAction Continue >> $log_file 2>&1
 mkdir bin >> $log_file 2>&1
 Move-Item "$SOURCES_PATH\php-src\$ARCH\$($OUT_PATH_REL)_TS\php-$PHP_DISPLAY_VER" bin\php
+
+mkdir bin\grpc >> $log_file 2>&1
+Move-Item "$LIB_BUILD_DIR\grpc\grpc_php_plugin.exe" "bin\grpc\grpc_php_plugin.exe" >> $log_file 2>&1
+Move-Item "$LIB_BUILD_DIR\grpc\third_party\protobuf\protoc.exe" "bin\grpc\protoc.exe" >> $log_file 2>&1
 
 $php_exe = "$outpath\bin\php\php.exe"
 
