@@ -828,6 +828,8 @@ function build_kafka {
 			-DWITH_CURL=OFF \
 			-DENABLE_LZ4_EXT=OFF \
 			-DCMAKE_BUILD_TYPE=Release \
+			-DRDKAFKA_BUILD_TESTS=OFF \
+			-DRDKAFKA_BUILD_EXAMPLES=OFF \
 			$CMAKE_GLOBAL_EXTRA_FLAGS \
 			$EXTRA_FLAGS \
 			>> "$DIR/install.log" 2>&1
