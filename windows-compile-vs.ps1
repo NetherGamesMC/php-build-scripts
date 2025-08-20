@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 
-$PHP_VERSIONS=@("8.2.28", "8.3.21")
+$PHP_VERSIONS=@("8.2.29", "8.3.24")
 
 $PHP_SDK_VER="2.3.0"
 $ARCH="x64"
@@ -14,7 +14,7 @@ $PTHREAD_W32_VER="3.0.0"
 $LEVELDB_MCPE_VER="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
 $LIBDEFLATE_VER="96836d7d9d10e3e0d53e6edb54eb908514e336c4" #1.24 - see above note about "v" prefixes
 $LIBRDKAFKA_VER="2.1.1"
-$LIBZSTD_VER="1.5.6"
+$LIBZSTD_VER="1.5.7"
 $LIBGRPC_VER="1.56.2"
 $LIBSNAPPY_VER="1.2.2"
 
@@ -34,7 +34,7 @@ $PHP_ARRAYDEBUG_VER="0.2.0"
 $PHP_ENCODING_VER="0.4.0"
 $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.3"
-$PHP_ZSTD_VER="0.14.0"
+$PHP_ZSTD_VER="0.15.1"
 $PHP_GRPC_VER="1.57.3"
 
 function pm-echo {
