@@ -1548,6 +1548,9 @@ rm -f ./aclocal.m4 >> "$DIR/install.log" 2>&1
 rm -rf ./autom4te.cache/ >> "$DIR/install.log" 2>&1
 rm -f ./configure >> "$DIR/install.log" 2>&1
 
+# Patch files for snappy, the effected lines causing the build to fail.
+patch "$BUILD_DIR/php/ext/snappy/config.m4" "$DIR/patches/config.m4.patch" >> "$DIR/install.log" 2>&1
+
 ./buildconf --force >> "$DIR/install.log" 2>&1
 
 #hack for curl with pkg-config (ext/curl doesn't give --static to pkg-config on static builds)

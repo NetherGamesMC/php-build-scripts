@@ -1,0 +1,20 @@
+--- config.m4.pre	2025-08-20 14:18:06.006163171 +0800
++++ config.m4.new	2025-08-20 14:18:51.560920972 +0800
+@@ -54,16 +54,7 @@
+       -L$LIBSNAPPY_LIBDIR
+     ])
+ 
+-    AC_LANG_PUSH([C++])
+-    AC_RUN_IFELSE([
+-        AC_LANG_PROGRAM(
+-            [#include <stdio.h>
+-             #include <snappy-stubs-public.h>],
+-            [printf("%d.%d.%d\n", SNAPPY_MAJOR, SNAPPY_MINOR, SNAPPY_PATCHLEVEL)])],
+-        [cw_cv_system_version=$(./conftest$EXEEXT)],
+-        [AC_MSG_ERROR(Failed to compile a version program!?)])
+-    AC_LANG_POP([C++])
+-    eval "LIBSNAPPY_VERSON=$cw_cv_system_version"
++    eval "LIBSNAPPY_VERSON=1.2.2"
+ 
+     AC_DEFINE_UNQUOTED(SNAPPY_LIB_VERSION, "$LIBSNAPPY_VERSON", [ ])
+ 
