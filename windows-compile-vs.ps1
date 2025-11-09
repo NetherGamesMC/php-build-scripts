@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 
-$PHP_VERSIONS=@("8.1.33", "8.2.29", "8.3.25", "8.4.13", "8.5.0beta3")
+$PHP_VERSIONS=@("8.1.33", "8.2.29", "8.3.27", "8.4.14", "8.5.0RC4")
 
 $PHP_SDK_VER="2.4.0"
 $ARCH="x64"
@@ -29,8 +29,8 @@ $PHP_RECURSIONGUARD_VER="0.1.0"
 $PHP_MORTON_VER="0.1.2"
 $PHP_LIBDEFLATE_VER="0.2.1"
 $PHP_XXHASH_VER="0.2.0"
-$PHP_XDEBUG_VER="3.4.5"
-$PHP_ARRAYDEBUG_VER="0.2.0"
+$PHP_XDEBUG_VER="3.4.7"
+$PHP_ARRAYDEBUG_VER="0.2.1"
 $PHP_ENCODING_VER="1.0.0"
 $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.3"
@@ -39,7 +39,7 @@ $PHP_GRPC_VER="1.57.3"
 
 $PHP_PMMPTHREAD_VER_PHP85="4aa34a27feaa43adba5f1e93939828d1d7afdefc"
 $PHP_IGBINARY_VER_PHP85="8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8"
-$PHP_XDEBUG_VER_PHP85="86727b0b05b5d0a9c4fb85021f05d7931e2c3a35"
+$PHP_XDEBUG_VER_PHP85="b8bc9425390ca7745abdc715a359d2f369c1a07b" #needs https://github.com/xdebug/xdebug/pull/1040 because of glob changes
 
 function pm-echo {
     param ([string] $message)

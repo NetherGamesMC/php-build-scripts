@@ -114,7 +114,7 @@ This script doesn't accept parameters, but the following environment variables a
 | [morton](https://github.com/pmmp/ext-morton) | Packing X/Z and X/Y/Z coordinates into ints in a format suitable for PHP array keys | Needed for performance |
 | [xxhash](https://github.com/pmmp/ext-xxhash/releases) | Not currently used | Could be replaced by `hash()` in recent versions of PHP but this extension has much better performance |
 | [arraydebug](https://github.com/pmmp/ext-arraydebug/tags) | Debugging array hash collisions | |
-| [encoding](https://github.com/pmmp/ext-encoding/releases) | Not currently used | Experimental, intended to replace `BinaryUtils` but never finished |
+| [encoding](https://github.com/pmmp/ext-encoding/releases) | Disk & network data encoding & decoding | Significantly faster alternative to [BinaryUtils](https://github.com/pmmp/BinaryUtils) |
 
 ### Misc
 

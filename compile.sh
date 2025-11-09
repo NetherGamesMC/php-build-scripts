@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PHP_VERSIONS=("8.1.33" "8.2.29" "8.3.25" "8.4.13" "8.5.0beta3")
+PHP_VERSIONS=("8.1.33" "8.2.29" "8.3.27" "8.4.14" "8.5.0RC4")
 
 #### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
 #### Use commit hashes to avoid this.
@@ -14,10 +14,10 @@ CURL_VERSION="curl-8_13_0"
 
 YAML_VERSION="0.2.5"
 LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
-LIBXML_VERSION="2.14.5"
+LIBXML_VERSION="2.15.1"
 LIBPNG_VERSION="1.6.50"
 LIBJPEG_VERSION="9f"
-OPENSSL_VERSION="3.5.2"
+OPENSSL_VERSION="3.6.0"
 LIBZIP_VERSION="1.11.4"
 SQLITE3_VERSION="3500400" #3.50.4
 LIBDEFLATE_VERSION="96836d7d9d10e3e0d53e6edb54eb908514e336c4" #1.24 - see above note about "v" prefixes
@@ -31,7 +31,7 @@ EXT_PMMPTHREAD_VERSION="6.2.0"
 EXT_YAML_VERSION="2.2.5"
 EXT_LEVELDB_VERSION="88071eb1b1eae96af043229104b9d813f7cbe40c" #release not tagged
 EXT_CHUNKUTILS2_VERSION="0.3.5"
-EXT_XDEBUG_VERSION="3.4.5"
+EXT_XDEBUG_VERSION="3.4.7"
 EXT_IGBINARY_VERSION="3.2.16"
 EXT_CRYPTO_VERSION="999b3c7edbc7f8ca4fdeb0bb4bbae488ad0daf07" #release not tagged
 EXT_SNAPPY_VERSION="0.2.3"
@@ -39,7 +39,7 @@ EXT_RECURSIONGUARD_VERSION="0.1.0"
 EXT_LIBDEFLATE_VERSION="0.2.1"
 EXT_MORTON_VERSION="0.1.2"
 EXT_XXHASH_VERSION="0.2.0"
-EXT_ARRAYDEBUG_VERSION="0.2.0"
+EXT_ARRAYDEBUG_VERSION="0.2.1"
 EXT_ENCODING_VERSION="1.0.0"
 EXT_RDKAFKA_VERSION="6.0.3"
 EXT_ZSTD_VERSION="0.15.2"
@@ -47,7 +47,7 @@ EXT_GRPC_VERSION="1.57.3"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
 
 EXT_PMMPTHREAD_VERSION_PHP85="4aa34a27feaa43adba5f1e93939828d1d7afdefc"
-EXT_XDEBUG_VERSION_PHP85="86727b0b05b5d0a9c4fb85021f05d7931e2c3a35"
+EXT_XDEBUG_VERSION_PHP85="3.5.0alpha2"
 EXT_IGBINARY_VERSION_PHP85="8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8"
 
 function write_out {
@@ -1802,7 +1802,7 @@ if [ "$HAVE_OPCACHE" == "yes" ]; then
 		echo "opcache.jit_buffer_size=128M" >> "$INSTALL_DIR/bin/php.ini"
 	fi
 fi
-if [ "$COMPILE_TARGET" == "mac-"* ]; then
+if [[ "$COMPILE_TARGET" == "mac-"* ]]; then
 	#we don't have permission to allocate executable memory on macOS due to not being codesigned
 	#workaround this for now by disabling PCRE JIT
 	echo "" >> "$INSTALL_DIR/bin/php.ini"
