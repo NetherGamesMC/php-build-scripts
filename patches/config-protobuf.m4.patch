@@ -1,0 +1,20 @@
+--- config.m4.pre	2025-12-04 20:15:57.432656800 +0800
++++ config.m4.new	2025-12-04 20:15:32.307286900 +0800
+@@ -1,11 +1,16 @@
+ PHP_ARG_ENABLE(protobuf, whether to enable Protobuf extension, [  --enable-protobuf   Enable Protobuf extension])
+ 
+ if test "$PHP_PROTOBUF" != "no"; then
++  PHP_ADD_LIBRARY(upb_mini_table_lib,, PROTOBUF_SHARED_LIBADD)
++  PHP_ADD_LIBRARY(upb_message_lib,, PROTOBUF_SHARED_LIBADD)
++  PHP_ADD_LIBRARY(upb_base_lib,, PROTOBUF_SHARED_LIBADD)
++  PHP_ADD_LIBRARY(upb_reflection_lib,, PROTOBUF_SHARED_LIBADD)
++  PHP_ADD_LIBRARY(upb_wire_lib,, PROTOBUF_SHARED_LIBADD)
+ 
+   PHP_NEW_EXTENSION(
+     protobuf,
+     arena.c array.c convert.c def.c map.c message.c names.c print_options.c php-upb.c protobuf.c third_party/utf8_range/utf8_range.c,
+     $ext_shared, , -std=gnu99 -I@ext_srcdir@/third_party/utf8_range)
+   PHP_ADD_BUILD_DIR($ext_builddir/third_party/utf8_range)
+-
++  PHP_SUBST(GRPC_SHARED_LIBADD)
+ fi

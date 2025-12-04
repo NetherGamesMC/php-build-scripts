@@ -35,7 +35,7 @@ $PHP_ENCODING_VER="1.0.0"
 $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.3"
 $PHP_ZSTD_VER="0.15.2"
-$PHP_GRPC_VER="1.57.3"
+$PHP_GRPC_VER="1.76.0"
 
 $PHP_PMMPTHREAD_VER_PHP85="4aa34a27feaa43adba5f1e93939828d1d7afdefc"
 $PHP_IGBINARY_VER_PHP85="8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8"
@@ -405,11 +405,20 @@ function build-grpc {
 ARG_ENABLE("protobuf", "Enable Protobuf extension", "yes");
 
 if (PHP_PROTOBUF != "no") {
-  EXTENSION("protobuf", "arena.c array.c convert.c def.c map.c message.c names.c php-upb.c protobuf.c", PHP_PROTOBUF_SHARED, "");
+  if (CHECK_LIB("upb_mini_table_lib.lib", "protobuf", PHP_PROTOBUF) &&
+      CHECK_LIB("upb_message_lib.lib", "protobuf", PHP_PROTOBUF) &&
+      CHECK_LIB("upb_base_lib.lib", "protobuf", PHP_PROTOBUF) &&
+      CHECK_LIB("upb_reflection_lib.lib", "protobuf", PHP_PROTOBUF) &&
+      CHECK_LIB("upb_wire_lib.lib", "protobuf", PHP_PROTOBUF)) {
 
-  ADD_SOURCES(configure_module_dirname + "/third_party/utf8_range", "naive.c range2-neon.c range2-sse.c", "protobuf");
+    ADD_SOURCES(configure_module_dirname + "/third_party/utf8_range", "utf8_range.c", "PROTOBUF");
+    ADD_FLAG("CFLAGS_PROTOBUF", "/I" + configure_module_dirname + "/third_party/utf8_range");
+    EXTENSION("protobuf", "arena.c array.c convert.c def.c map.c message.c names.c print_options.c php-upb.c protobuf.c");
 
-  AC_DEFINE('HAVE_PROTOBUF', 1, '');
+    AC_DEFINE('HAVE_PROTOBUF', 1, '');
+  } else {
+    WARNING("php-grpc not enabled; libraries and headers not found");
+  }
 }
 "@ | Out-File -Encoding ascii -FilePath $SOURCES_PATH\ext\protobuf\config.w32
 

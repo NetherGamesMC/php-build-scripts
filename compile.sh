@@ -43,7 +43,7 @@ EXT_ARRAYDEBUG_VERSION="0.2.1"
 EXT_ENCODING_VERSION="1.0.0"
 EXT_RDKAFKA_VERSION="6.0.3"
 EXT_ZSTD_VERSION="0.15.2"
-EXT_GRPC_VERSION="1.57.3"
+EXT_GRPC_VERSION="1.76.0"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
 
 EXT_PMMPTHREAD_VERSION_PHP85="4aa34a27feaa43adba5f1e93939828d1d7afdefc"
@@ -1433,9 +1433,9 @@ write_out "PHP" "Downloading additional extensions..."
 
 get_github_extension "pmmpthread" "$EXT_PMMPTHREAD_VERSION" "pmmp" "ext-pmmpthread"
 
-
 get_github_extension "yaml" "$EXT_YAML_VERSION" "php" "pecl-file_formats-yaml"
-#get_pecl_extension "yaml" "$EXT_YAML_VERSION"
+
+get_pecl_extension "yaml" "$EXT_YAML_VERSION"
 
 get_github_extension "igbinary" "$EXT_IGBINARY_VERSION" "igbinary" "igbinary"
 
@@ -1446,7 +1446,7 @@ git clone https://github.com/bukka/php-crypto.git "$BUILD_DIR/php/ext/crypto" >>
 cd "$BUILD_DIR/php/ext/crypto"
 git checkout "$EXT_CRYPTO_VERSION" >> "$DIR/install.log" 2>&1
 git submodule update --init --recursive >> "$DIR/install.log" 2>&1
-cd "$BUILD_DIR"
+cd "$BUILD_DIR/php"
 write_done
 
 get_github_extension "snappy" "$EXT_SNAPPY_VERSION" "kjdev" "php-ext-snappy"
@@ -1566,13 +1566,13 @@ fi
 write_library "PHP" "$PHP_VERSION"
 
 write_configure
-cd php
 rm -f ./aclocal.m4 >> "$DIR/install.log" 2>&1
 rm -rf ./autom4te.cache/ >> "$DIR/install.log" 2>&1
 rm -f ./configure >> "$DIR/install.log" 2>&1
 
 # Patch files for snappy, the effected lines causing the build to fail.
-patch "$BUILD_DIR/php/ext/snappy/config.m4" "$DIR/patches/config.m4.patch" >> "$DIR/install.log" 2>&1
+patch "$BUILD_DIR/php/ext/snappy/config.m4" "$DIR/patches/config-snappy.m4.patch" >> "$DIR/install.log" 2>&1
+patch "$BUILD_DIR/php/ext/protobuf/config.m4" "$DIR/patches/config-protobuf.m4.patch" >> "$DIR/install.log" 2>&1
 
 ./buildconf --force >> "$DIR/install.log" 2>&1
 
