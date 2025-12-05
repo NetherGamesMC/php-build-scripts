@@ -1,7 +1,7 @@
 ﻿$ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 
-$PHP_VERSIONS=@("8.1.33", "8.2.29", "8.3.27", "8.4.14", "8.5.0RC4")
+$PHP_VERSIONS=@("8.1.33", "8.2.29", "8.3.28", "8.4.15", "8.5.0")
 
 $PHP_SDK_VER="2.4.0"
 $ARCH="x64"
@@ -13,7 +13,7 @@ $LIBYAML_VER="0.2.5"
 $PTHREAD_W32_VER="3.0.0"
 $LEVELDB_MCPE_VER="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
 $LIBDEFLATE_VER="96836d7d9d10e3e0d53e6edb54eb908514e336c4" #1.24 - see above note about "v" prefixes
-$LIBRDKAFKA_VER="2.1.1"
+$LIBRDKAFKA_VER="2.12.1"
 $LIBZSTD_VER="1.5.7"
 $LIBGRPC_VER="1.76.0"
 $LIBSNAPPY_VER="1.2.2"
@@ -33,7 +33,7 @@ $PHP_XDEBUG_VER="3.4.7"
 $PHP_ARRAYDEBUG_VER="0.2.1"
 $PHP_ENCODING_VER="1.0.0"
 $PHP_VANILLAGENERATOR_VER="2.1.7"
-$PHP_LIBKAFKA_VER="6.0.3"
+$PHP_LIBKAFKA_VER="6.0.4"
 $PHP_ZSTD_VER="0.15.2"
 $PHP_GRPC_VER="1.76.0"
 

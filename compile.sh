@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PHP_VERSIONS=("8.1.33" "8.2.29" "8.3.27" "8.4.14" "8.5.0RC4")
+PHP_VERSIONS=("8.1.33" "8.2.29" "8.3.28" "8.4.15" "8.5.0")
 
 #### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
 #### Use commit hashes to avoid this.
@@ -21,7 +21,7 @@ OPENSSL_VERSION="3.6.0"
 LIBZIP_VERSION="1.11.4"
 SQLITE3_VERSION="3500400" #3.50.4
 LIBDEFLATE_VERSION="96836d7d9d10e3e0d53e6edb54eb908514e336c4" #1.24 - see above note about "v" prefixes
-LIBRDKAFKA_VER="2.1.1"
+LIBRDKAFKA_VER="2.12.1"
 LIBZSTD_VER="1.5.7"
 LIBGRPC_VER="1.76.0"
 LIBSNAPPY_VER="1.2.2"
@@ -41,7 +41,7 @@ EXT_MORTON_VERSION="0.1.2"
 EXT_XXHASH_VERSION="0.2.0"
 EXT_ARRAYDEBUG_VERSION="0.2.1"
 EXT_ENCODING_VERSION="1.0.0"
-EXT_RDKAFKA_VERSION="6.0.3"
+EXT_RDKAFKA_VERSION="6.0.4"
 EXT_ZSTD_VERSION="0.15.2"
 EXT_GRPC_VERSION="1.76.0"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"

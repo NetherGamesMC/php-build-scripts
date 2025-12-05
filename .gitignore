@@ -5,3 +5,5 @@ temp_data/
 compile.log
 /*.zip
 /*.exe
+bin-debug/
+download_cache/
