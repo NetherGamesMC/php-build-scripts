@@ -305,6 +305,70 @@ function append-file-utf8 {
     Out-File -Append -FilePath $file -Encoding utf8 -InputObject $line
 }
 
+function create-extension-directories {
+    param ([string] $basePath)
+
+    $directories = @(
+        "TSRM", "Zend", "Zend\Optimizer", "ext", "ext\bcmath", "ext\bcmath\libbcmath", "ext\bcmath\libbcmath\src",
+        "ext\bz2", "ext\calendar", "ext\chunkutils2", "ext\chunkutils2\src", "ext\crypto", "ext\ctype",
+        "ext\curl", "ext\date", "ext\date\lib", "ext\dom", "ext\dom\lexbor", "ext\dom\lexbor\selectors-adapted",
+        "ext\dom\parentnode", "ext\ext-arraydebug-0.2.1", "ext\ext-encoding-1.0.0", "ext\ext-encoding-1.0.0\classes",
+        "ext\ext-libdeflate-0.2.1", "ext\ext-pmmpthread-4aa34a27feaa43adba5f1e93939828d1d7afdefc",
+        "ext\ext-pmmpthread-4aa34a27feaa43adba5f1e93939828d1d7afdefc\classes",
+        "ext\ext-pmmpthread-4aa34a27feaa43adba5f1e93939828d1d7afdefc\src", "ext\ext-recursionguard-0.1.0",
+        "ext\ext-vanillagenerator-2.1.7", "ext\ext-vanillagenerator-2.1.7\lib", "ext\ext-vanillagenerator-2.1.7\lib\biomes",
+        "ext\ext-vanillagenerator-2.1.7\lib\chunk", "ext\ext-vanillagenerator-2.1.7\lib\generator",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\biomegrid", "ext\ext-vanillagenerator-2.1.7\lib\generator\ground",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\misc", "ext\ext-vanillagenerator-2.1.7\lib\generator\nether",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\nether\decorators", "ext\ext-vanillagenerator-2.1.7\lib\generator\nether\populators",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\object", "ext\ext-vanillagenerator-2.1.7\lib\generator\object\trees",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\object\trees\defaults", "ext\ext-vanillagenerator-2.1.7\lib\generator\overworld",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\overworld\carver", "ext\ext-vanillagenerator-2.1.7\lib\generator\overworld\decorators",
+        "ext\ext-vanillagenerator-2.1.7\lib\generator\overworld\populators", "ext\ext-vanillagenerator-2.1.7\lib\noise",
+        "ext\ext-vanillagenerator-2.1.7\lib\noise\octaves", "ext\ext-vanillagenerator-2.1.7\lib\objects",
+        "ext\ext-vanillagenerator-2.1.7\lib\objects\blocks", "ext\ext-vanillagenerator-2.1.7\lib\objects\math",
+        "ext\ext-vanillagenerator-2.1.7\lib\objects\random", "ext\ext-vanillagenerator-2.1.7\src", "ext\ext-xxhash-0.2.0",
+        "ext\ffi", "ext\fileinfo", "ext\fileinfo\libmagic", "ext\filter", "ext\gd", "ext\gd\libgd", "ext\gmp",
+        "ext\hash", "ext\hash\murmur", "ext\hash\sha3", "ext\hash\sha3\generic64lc", "ext\iconv",
+        "ext\igbinary-8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8", "ext\igbinary-8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8\src",
+        "ext\igbinary-8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8\src\php7", "ext\json", "ext\lexbor", "ext\lexbor\lexbor",
+        "ext\lexbor\lexbor\core", "ext\lexbor\lexbor\css", "ext\lexbor\lexbor\css\selectors", "ext\lexbor\lexbor\css\syntax",
+        "ext\lexbor\lexbor\css\syntax\tokenizer", "ext\lexbor\lexbor\dom", "ext\lexbor\lexbor\dom\interfaces",
+        "ext\lexbor\lexbor\encoding", "ext\lexbor\lexbor\html", "ext\lexbor\lexbor\html\interfaces",
+        "ext\lexbor\lexbor\html\tokenizer", "ext\lexbor\lexbor\html\tree", "ext\lexbor\lexbor\html\tree\insertion_mode",
+        "ext\lexbor\lexbor\ns", "ext\lexbor\lexbor\ports", "ext\lexbor\lexbor\ports\windows_nt",
+        "ext\lexbor\lexbor\ports\windows_nt\lexbor", "ext\lexbor\lexbor\ports\windows_nt\lexbor\core",
+        "ext\lexbor\lexbor\punycode", "ext\lexbor\lexbor\tag", "ext\lexbor\lexbor\unicode", "ext\lexbor\lexbor\url",
+        "ext\libxml", "ext\mbstring", "ext\mbstring\libmbfl", "ext\mbstring\libmbfl\filters", "ext\mbstring\libmbfl\mbfl",
+        "ext\mbstring\libmbfl\nls", "ext\morton", "ext\mysqli", "ext\mysqlnd", "ext\opcache", "ext\opcache\jit",
+        "ext\opcache\jit\ir", "ext\opcache\jit\tls", "ext\openssl", "ext\pcre", "ext\pcre\pcre2lib", "ext\pdo",
+        "ext\pdo_mysql", "ext\pdo_sqlite", "ext\pecl-file_formats-yaml-2.2.5", "ext\phar", "ext\php-ext-zstd-0.15.2",
+        "ext\php-leveldb-88071eb1b1eae96af043229104b9d813f7cbe40c", "ext\php-rdkafka-6.0.3", "ext\protobuf",
+        "ext\protobuf\third_party", "ext\protobuf\third_party\utf8_range", "ext\random", "ext\reflection",
+        "ext\simplexml", "ext\snappy", "ext\sockets", "ext\sodium", "ext\spl", "ext\sqlite3", "ext\standard",
+        "ext\standard\libavifinfo", "ext\tokenizer", "ext\uri", "ext\uri\uriparser", "ext\uri\uriparser\src",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b", "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\base", "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\coverage",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\debugger", "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\develop",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\gcstats", "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\lib",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\lib\maps", "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\profiler",
+        "ext\xdebug-b8bc9425390ca7745abdc715a359d2f369c1a07b\src\tracing", "ext\xml", "ext\xmlreader", "ext\xmlwriter",
+        "ext\zip", "ext\zlib", "main", "main\streams", "sapi", "sapi\cli", "win32"
+    )
+
+    foreach ($dir in $directories) {
+        $path = Join-Path -Path $basePath -ChildPath $dir
+        if (!(Test-Path $path)) {
+            try {
+                New-Item -Path $path -ItemType Directory -Force >> $log_file 2>&1
+            } catch {
+                pm-echo-error "Failed to create directory: $path" >> $log_file 2>&1
+                pm-echo-error $_.Exception.Message >> $log_file 2>&1
+            }
+        }
+    }
+}
+
 function download-sdk {
     write-library "PHP SDK" $PHP_SDK_VER
 
@@ -765,6 +829,12 @@ sdk-command "configure^`
     --with-pdo-mysql^`
     --with-pdo-sqlite^`
     --without-readline"
+
+if ($PHP_VERSION_ID -ge 80500) {
+    # Create all required extension directories, we do this manually because we exceeded Makefile length limit...
+    create-extension-directories "$SOURCES_PATH\x64\Release_TS"
+    (Get-Content -Path "$SOURCES_PATH\Makefile") -replace "^BUILD_DIRS_SUB=.*", "BUILD_DIRS_SUB=" | Set-Content -Path "$SOURCES_PATH\Makefile"
+}
 
 write-compile
 sdk-command "nmake"
