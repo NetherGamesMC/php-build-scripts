@@ -343,7 +343,7 @@ function create-extension-directories {
         "ext\mbstring\libmbfl\nls", "ext\morton", "ext\mysqli", "ext\mysqlnd", "ext\opcache", "ext\opcache\jit",
         "ext\opcache\jit\ir", "ext\opcache\jit\tls", "ext\openssl", "ext\pcre", "ext\pcre\pcre2lib", "ext\pdo",
         "ext\pdo_mysql", "ext\pdo_sqlite", "ext\pecl-file_formats-yaml-2.2.5", "ext\phar", "ext\php-ext-zstd-0.15.2",
-        "ext\php-leveldb-88071eb1b1eae96af043229104b9d813f7cbe40c", "ext\php-rdkafka-6.0.3", "ext\protobuf",
+        "ext\php-leveldb-88071eb1b1eae96af043229104b9d813f7cbe40c", "ext\php-rdkafka-6.0.4", "ext\protobuf",
         "ext\protobuf\third_party", "ext\protobuf\third_party\utf8_range", "ext\random", "ext\reflection",
         "ext\simplexml", "ext\snappy", "ext\sockets", "ext\sodium", "ext\spl", "ext\sqlite3", "ext\standard",
         "ext\standard\libavifinfo", "ext\tokenizer", "ext\uri", "ext\uri\uriparser", "ext\uri\uriparser\src",
@@ -527,6 +527,8 @@ function build_rdkafka {
         -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
         -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
         -DBUILD_SHARED_LIBS=ON^`
+        -DRDKAFKA_BUILD_EXAMPLES=OFF^`
+        -DRDKAFKA_BUILD_TESTS=OFF^`
         -DWITH_ZSTD=ON^`
         -DWITH_SSL=ON^`
         -DWITH_CURL=OFF^`
