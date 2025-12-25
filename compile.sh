@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PHP_VERSIONS=("8.1.33" "8.2.29" "8.3.28" "8.4.15" "8.5.0")
+PHP_VERSIONS=("8.1.34" "8.2.30" "8.3.29" "8.4.16" "8.5.0")
 
 #### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
 #### Use commit hashes to avoid this.
@@ -15,23 +15,23 @@ CURL_VERSION="curl-8_13_0"
 YAML_VERSION="0.2.5"
 LEVELDB_VERSION="1c7564468b41610da4f498430e795ca4de0931ff" #release not tagged
 LIBXML_VERSION="2.15.1"
-LIBPNG_VERSION="1.6.50"
+LIBPNG_VERSION="1.6.53"
 LIBJPEG_VERSION="9f"
 OPENSSL_VERSION="3.6.0"
 LIBZIP_VERSION="1.11.4"
-SQLITE3_VERSION="3500400" #3.50.4
-LIBDEFLATE_VERSION="96836d7d9d10e3e0d53e6edb54eb908514e336c4" #1.24 - see above note about "v" prefixes
+SQLITE3_VERSION="3510100" #3.51.1
+LIBDEFLATE_VERSION="c8c56a20f8f621e6a966b716b31f1dedab6a41e3" #1.25 - see above note about "v" prefixes
 LIBRDKAFKA_VER="2.12.1"
 LIBZSTD_VER="1.5.7"
 LIBGRPC_VER="1.76.0"
 LIBSNAPPY_VER="1.2.2"
 SASL2_VERSION="2.1.28"
 
-EXT_PMMPTHREAD_VERSION="6.2.0"
-EXT_YAML_VERSION="2.2.5"
+EXT_PMMPTHREAD_VERSION="6.3.0"
+EXT_YAML_VERSION="2.3.0"
 EXT_LEVELDB_VERSION="88071eb1b1eae96af043229104b9d813f7cbe40c" #release not tagged
 EXT_CHUNKUTILS2_VERSION="0.3.5"
-EXT_XDEBUG_VERSION="3.4.7"
+EXT_XDEBUG_VERSION="3.5.0"
 EXT_IGBINARY_VERSION="3.2.16"
 EXT_CRYPTO_VERSION="999b3c7edbc7f8ca4fdeb0bb4bbae488ad0daf07" #release not tagged
 EXT_SNAPPY_VERSION="0.2.3"
@@ -46,9 +46,7 @@ EXT_ZSTD_VERSION="0.15.2"
 EXT_GRPC_VERSION="1.76.0"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
 
-EXT_PMMPTHREAD_VERSION_PHP85="4aa34a27feaa43adba5f1e93939828d1d7afdefc"
-EXT_XDEBUG_VERSION_PHP85="3.5.0alpha2"
-EXT_IGBINARY_VERSION_PHP85="8f8b7175c7859f1845bcdee6f7d0baeea7d07cb8"
+EXT_IGBINARY_VERSION_PHP85="3.2.17RC1"
 
 function write_out {
 	echo "[$1] $2"
@@ -320,8 +318,6 @@ PHP_VERSION_ID=$(php_version_id "$PHP_VERSION")
 write_out "opt" "Selected PHP $PHP_VERSION ($PHP_VERSION_ID)"
 
 if [ $PHP_VERSION_ID -ge 80500 ]; then
-  EXT_PMMPTHREAD_VERSION="$EXT_PMMPTHREAD_VERSION_PHP85"
-  EXT_XDEBUG_VERSION="$EXT_XDEBUG_VERSION_PHP85"
   EXT_IGBINARY_VERSION="$EXT_IGBINARY_VERSION_PHP85"
 fi
 if [ $PHP_VERSION_ID -ge 80400 ]; then
@@ -331,7 +327,7 @@ if [ "$HAVE_OPCACHE_JIT" == "yes" ]; then
   if [ $PHP_VERSION_ID -lt 80400 ]; then
     write_out "WARNING" "JIT in versions below PHP 8.4 is highly unstable and not recommended"
   else
-    write_out "WARNING" "JIT in PHP 8.4 has not been tested, use it with caution"
+    write_out "WARNING" "JIT in PHP 8.4+ may be unstable, use it with caution"
   fi
 else
   write_out "INFO" "JIT support in OPcache won't be compiled"
@@ -502,6 +498,7 @@ else
 		exit 1
 	elif [ -z "$CFLAGS" ]; then
 		if [ `getconf LONG_BIT` == "64" ]; then
+			COMPILE_TARGET="linux64"
 			write_out "INFO" "Compiling for current machine using 64-bit"
 			if [ "$(uname -m)" != "aarch64" ]; then
 				CFLAGS="-m64 $CFLAGS"
@@ -515,9 +512,11 @@ else
 fi
 
 if [ "$DO_STATIC" == "yes" ]; then
-	HAVE_OPCACHE="no" #doesn't work on static builds
-	HAVE_OPCACHE_JIT="no"
-	write_out "warning" "OPcache cannot be used on static builds; this may have a negative effect on performance"
+    if [ "$PHP_VERSION_ID" -lt 80500 ]; then
+		HAVE_OPCACHE="no"
+		HAVE_OPCACHE_JIT="no"
+		write_out "warning" "OPcache cannot be used on static builds prior to PHP 8.5; this may have a negative effect on performance"
+	fi
 	if [ "$FSANITIZE_OPTIONS" != "" ]; then
 		write_out "warning" "Sanitizers cannot be used on static builds"
 	fi
@@ -926,7 +925,7 @@ function build_gmp {
 		download_from_mirror "gmp-$GMP_VERSION.tar.xz" "gmp" | tar -Jx >> "$DIR/install.log" 2>&1
 		write_configure
 		cd "$gmp_dir"
-		RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
+		CFLAGS="-std=gnu17 $CFLAGS" RANLIB=$RANLIB ./configure --prefix="$INSTALL_DIR" \
 		$EXTRA_FLAGS \
 		--disable-posix-threads \
 		--enable-static \
@@ -1473,7 +1472,32 @@ get_github_extension "rdkafka" "$EXT_RDKAFKA_VERSION" "arnaud-lb" "php-rdkafka"
 
 get_github_extension "zstd" "$EXT_ZSTD_VERSION" "kjdev" "php-ext-zstd"
 
-if [ "$(uname -s)" == "Darwin" ]; then
+cafile=""
+if [[ "$COMPILE_TARGET" == "mac"* ]]; then
+	cafile="/etc/ssl/cert.pem"
+elif [[ "$COMPILE_TARGET" == "linux"* ]] && [[ "$IS_CROSSCOMPILE" != "yes" ]]; then
+	#try to detect the correct location from the current system
+	for file in \
+		"$SSL_CERT_FILE" \
+		"/etc/ssl/certs/ca-certificates.crt" \
+		"/etc/pki/tls/certs/ca-bundle-crt" \
+		"/etc/ssl/cert.pem";
+	do
+		if [ -f "$file" ]; then
+			cafile="$file"
+			break
+		fi
+	done
+else
+	echo "wtf $COMPILE_TARGET"
+fi
+if [ -z "$cafile" ]; then
+	write_out "WARNING" "Don't know where to find SSL CA bundle for this target; PHP code won't be able to safely access https:// links unless openssl.cafile is configured to the correct path in php.ini"
+else
+	write_out "INFO" "System SSL CA bundle detected as $cafile; if this is not correct, please adjust openssl.cafile in php.ini"
+fi
+
+if [[ "$COMPILE_TARGET" == "mac"* ]]; then
 	echo "[rdkafka] Implementing quick patch for MacOS support."
 
 	rm $BUILD_DIR/php/ext/rdkafka/config.m4 2>&1
@@ -1781,6 +1805,9 @@ echo "display_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "display_startup_errors=1" >> "$INSTALL_DIR/bin/php.ini"
 echo "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" >> "$INSTALL_DIR/bin/php.ini"
 echo "extension_dir=./$INSTALL_DIR/lib/php/extensions/no-debug-zts-20230831" >> "$INSTALL_DIR/bin/php.ini"
+if [ -n "$cafile" ]; then
+	echo "openssl.cafile=$cafile" >> "$INSTALL_DIR/bin/php.ini"
+fi
 
 if [ "$HAVE_OPCACHE" == "yes" ]; then
 	if [ "$PHP_VERSION_ID" -lt 80500 ]; then
