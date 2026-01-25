@@ -35,7 +35,7 @@ jobs:
   publish-archive-release:
     name: Publish archive release
     needs: [all-builds]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: ${{ github.ref_name == 'stable' && github.ref_type == 'branch' && !contains(github.event.head_commit.message, '[no release]') }}
 
     steps:
