@@ -36,6 +36,7 @@ $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.4"
 $PHP_ZSTD_VER="0.15.2"
 $PHP_GRPC_VER="1.76.0"
+$PHP_MONGODB_VER="1.18.0"
 
 $PHP_IGBINARY_VER_PHP85="3.2.17RC1"
 
@@ -709,6 +710,14 @@ function download-php-extensions {
     write-done
     Pop-Location
 
+    # ---------------------------
+    # MongoDB PHP Driver
+    # ---------------------------
+    write-library "php-ext mongodb" $PHP_MONGODB_VER
+    write-download
+    (& cmd.exe /c "git clone --depth 1 --branch $PHP_MONGODB_VER https://github.com/mongodb/mongo-php-driver.git mongodb 2>&1") >> $log_file
+    write-done
+
     write-library "php-ext snappy" $PHP_SNAPPY_VER
     write-download
     (& cmd.exe /c "git clone https://github.com/kjdev/php-ext-snappy.git snappy 2>&1") >> $log_file
@@ -790,6 +799,7 @@ sdk-command "configure^`
     --enable-zstd^`
     --enable-snappy^`
     --enable-grpc=shared^`
+    --enable-mongodb=shared^`
     --enable-protobuf=shared^`
     --enable-recursionguard=shared^`
     --enable-sockets^`
@@ -903,6 +913,7 @@ append-file-utf8 "extension=php_vanillagenerator.dll" $php_ini
 append-file-utf8 "extension=php_rdkafka.dll" $php_ini
 append-file-utf8 "extension=php_mysqli.dll" $php_ini
 append-file-utf8 "extension=php_sqlite3.dll" $php_ini
+append-file-utf8 "extension=php_mongodb.dll" $php_ini
 append-file-utf8 ";Optional extensions, supplied for debugging" $php_ini
 append-file-utf8 "extension=php_recursionguard.dll" $php_ini
 append-file-utf8 "recursionguard.enabled=0 ;disabled due to minor performance impact, only enable this if you need it for debugging" $php_ini
