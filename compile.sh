@@ -27,7 +27,7 @@ LIBGRPC_VER="1.76.0"
 LIBSNAPPY_VER="1.2.2"
 SASL2_VERSION="2.1.28"
 
-EXT_PMMPTHREAD_VERSION="6.3.0"
+EXT_PMMPTHREAD_VERSION="de0d03b6ffecb1a03c06bb47912c2257c0b02b65"
 EXT_YAML_VERSION="2.3.0"
 EXT_LEVELDB_VERSION="88071eb1b1eae96af043229104b9d813f7cbe40c" #release not tagged
 EXT_CHUNKUTILS2_VERSION="0.3.5"
@@ -1430,7 +1430,7 @@ function get_pecl_extension {
 cd "$BUILD_DIR/php"
 write_out "PHP" "Downloading additional extensions..."
 
-get_github_extension "pmmpthread" "$EXT_PMMPTHREAD_VERSION" "pmmp" "ext-pmmpthread"
+get_github_extension "pmmpthread" "$EXT_PMMPTHREAD_VERSION" "larryTheCoder" "ext-pmmpthread"
 
 get_github_extension "yaml" "$EXT_YAML_VERSION" "php" "pecl-file_formats-yaml"
 
