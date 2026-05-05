@@ -45,6 +45,10 @@ EXT_RDKAFKA_VERSION="6.0.4"
 EXT_ZSTD_VERSION="0.15.2"
 EXT_GRPC_VERSION="1.76.0"
 EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
+# ext-quiche is a Rust cdylib (built with cargo, not PHP autoconf). Pin to a
+# branch name (e.g. "master"), tag, or 40-char commit SHA — the build step
+# below switches between `git checkout` and tarball download accordingly.
+EXT_QUICHE_VERSION="master"
 
 EXT_IGBINARY_VERSION_PHP85="3.2.17RC1"
 
@@ -160,6 +164,7 @@ COMPILE_DEBUG="no"
 HAVE_VALGRIND="--without-valgrind"
 HAVE_OPCACHE="yes"
 HAVE_XDEBUG="yes"
+HAVE_QUICHE="yes"
 FSANITIZE_OPTIONS=""
 FLAGS_LTO=""
 HAVE_OPCACHE_JIT="no"
@@ -523,6 +528,10 @@ if [ "$DO_STATIC" == "yes" ]; then
 	if [ "$HAVE_XDEBUG" == "yes" ]; then
 	  write_out "warning" "Xdebug cannot be built in static mode"
 	  HAVE_XDEBUG="no"
+	fi
+	if [ "$HAVE_QUICHE" == "yes" ]; then
+	  write_out "warning" "ext-quiche is a cdylib and cannot be built into a static PHP"
+	  HAVE_QUICHE="no"
 	fi
 fi
 
@@ -1861,6 +1870,86 @@ if [[ "$HAVE_XDEBUG" == "yes" ]]; then
 	echo "xdebug.trace_output_name=trace.%s.%p.%r" >> "$INSTALL_DIR/bin/php.ini" 2>&1
 	write_done
 	write_out INFO "Xdebug is included, but disabled by default. To enable it, change 'xdebug.mode' in your php.ini file."
+fi
+
+#
+# ext-quiche — a PHP-callable QUIC server built on top of tokio-quiche.
+# Unlike the other extensions in this script it is a Rust crate, not a
+# PHP autoconf module, so it is built with `cargo` and the resulting
+# cdylib is dropped into PHP's extension directory. We do this AFTER
+# `make install` so we can use the freshly-built `php-config` to learn
+# the canonical extension dir.
+#
+if [[ "$HAVE_QUICHE" == "yes" ]]; then
+	if ! type cargo >> "$DIR/install.log" 2>&1; then
+		write_out "WARNING" "ext-quiche skipped: 'cargo' (Rust toolchain) not found in PATH. Install rustup if you want this extension."
+	elif [[ "$IS_CROSSCOMPILE" == "yes" ]] || [[ "$COMPILE_FOR_ANDROID" == "yes" ]] || [[ "$IS_WINDOWS" == "yes" ]]; then
+		write_out "WARNING" "ext-quiche skipped: cross-compile / Android / Windows targets are not supported by the boring-sys dependency"
+	else
+		write_library "ext-quiche" "$EXT_QUICHE_VERSION"
+		EXT_QUICHE_DIR="$BUILD_DIR/ext-quiche"
+		rm -rf "$EXT_QUICHE_DIR" 2>> "$DIR/install.log"
+
+		write_download
+		# A 40-char hex string is treated as a commit SHA → git clone+checkout.
+		# Anything else is treated as a tag/branch name → tarball download
+		# (faster and keeps the cache friendly), with a git-clone fallback for
+		# branches that don't have a stable archive URL.
+		if [[ "$EXT_QUICHE_VERSION" =~ ^[0-9a-f]{40}$ ]] || [[ "$EXT_QUICHE_VERSION" == "master" ]] || [[ "$EXT_QUICHE_VERSION" == "main" ]]; then
+			git clone --quiet "https://github.com/NetherGamesMC/ext-quiche.git" "$EXT_QUICHE_DIR" >> "$DIR/install.log" 2>&1 || {
+				write_error "ext-quiche: git clone failed; see install.log"
+				exit 1
+			}
+			(cd "$EXT_QUICHE_DIR" && git checkout --quiet "$EXT_QUICHE_VERSION") >> "$DIR/install.log" 2>&1 || {
+				write_error "ext-quiche: failed to check out $EXT_QUICHE_VERSION"
+				exit 1
+			}
+		else
+			mkdir -p "$EXT_QUICHE_DIR"
+			download_github_src "NetherGamesMC/ext-quiche" "$EXT_QUICHE_VERSION" "ext-quiche" \
+				| tar -zx --strip-components=1 -C "$EXT_QUICHE_DIR" >> "$DIR/install.log" 2>&1 || {
+					write_error "ext-quiche: tarball download/extract failed"
+					exit 1
+				}
+		fi
+
+		write_compile
+		# `cargo build --release` produces target/release/libext_quiche.{so,dylib}.
+		# Use --jobs to honour the user's -j setting; fall back to cargo's default
+		# parallelism if THREADS is unset.
+		CARGO_JOBS_FLAG=""
+		if [ -n "$THREADS" ]; then
+			CARGO_JOBS_FLAG="--jobs $THREADS"
+		fi
+		(cd "$EXT_QUICHE_DIR" && cargo build --release $CARGO_JOBS_FLAG) >> "$DIR/install.log" 2>&1 || {
+			write_error "ext-quiche: cargo build failed; see install.log"
+			exit 1
+		}
+
+		write_install
+		PHP_EXT_DIR=$("$INSTALL_DIR/bin/php-config" --extension-dir 2>> "$DIR/install.log")
+		if [ -z "$PHP_EXT_DIR" ] || [ ! -d "$PHP_EXT_DIR" ]; then
+			write_error "ext-quiche: could not resolve PHP extension dir from php-config"
+			exit 1
+		fi
+
+		# Linux → libext_quiche.so, macOS → libext_quiche.dylib. PHP loads either
+		# but php.ini uses one filename, so we install both as ext_quiche.so.
+		if [ -f "$EXT_QUICHE_DIR/target/release/libext_quiche.so" ]; then
+			cp "$EXT_QUICHE_DIR/target/release/libext_quiche.so" "$PHP_EXT_DIR/ext_quiche.so" >> "$DIR/install.log" 2>&1
+		elif [ -f "$EXT_QUICHE_DIR/target/release/libext_quiche.dylib" ]; then
+			cp "$EXT_QUICHE_DIR/target/release/libext_quiche.dylib" "$PHP_EXT_DIR/ext_quiche.so" >> "$DIR/install.log" 2>&1
+		else
+			write_error "ext-quiche: built artifact not found in $EXT_QUICHE_DIR/target/release/"
+			exit 1
+		fi
+
+		echo "" >> "$INSTALL_DIR/bin/php.ini"
+		echo "; ext-quiche — QUIC server bindings (Rust cdylib)" >> "$INSTALL_DIR/bin/php.ini"
+		echo "extension=ext_quiche.so" >> "$INSTALL_DIR/bin/php.ini"
+
+		write_done
+	fi
 fi
 
 
