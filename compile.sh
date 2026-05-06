@@ -1921,7 +1921,11 @@ if [[ "$HAVE_QUICHE" == "yes" ]]; then
 		if [ -n "$THREADS" ]; then
 			CARGO_JOBS_FLAG="--jobs $THREADS"
 		fi
-		(cd "$EXT_QUICHE_DIR" && cargo build --release $CARGO_JOBS_FLAG) >> "$DIR/install.log" 2>&1 || {
+		# Point ext-php-rs at the just-built php-config so its build script picks up
+		# the correct ABI (ZTS vs NTS, include paths, etc). Without this it falls
+		# back to whatever PHP is on $PATH and produces a binary with mismatched
+		# symbols (e.g. undefined `executor_globals` against a ZTS host).
+		(cd "$EXT_QUICHE_DIR" && PHP_CONFIG="$INSTALL_DIR/bin/php-config" PHP="$INSTALL_DIR/bin/php" cargo build --release $CARGO_JOBS_FLAG) >> "$DIR/install.log" 2>&1 || {
 			write_error "ext-quiche: cargo build failed; see install.log"
 			exit 1
 		}
