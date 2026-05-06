@@ -737,6 +737,24 @@ $DEPS_DIR="$BASE_PATH\deps-php-$PHP_VERSION_BASE-$($OUT_PATH_REL.ToLower())"
 download-php-deps
 download-php
 
+$curl_config_w32 = "$SOURCES_PATH\ext\curl\config.w32"
+if (Test-Path $curl_config_w32) {
+    $brotli_marker = 'brotlidec'
+    $curl_content = [System.IO.File]::ReadAllText($curl_config_w32)
+    if (-not $curl_content.Contains($brotli_marker)) {
+        $brotli_original = 'ADD_FLAG("CFLAGS_CURL", "/D CURL_STATICLIB");'
+        $brotli_replacement = @'
+ADD_FLAG("CFLAGS_CURL", "/D CURL_STATICLIB");
+			if (CHECK_LIB("brotlidec_a.lib;brotlidec.lib", "curl", PHP_CURL) &&
+				CHECK_LIB("brotlicommon_a.lib;brotlicommon.lib", "curl", PHP_CURL)) {
+				AC_DEFINE('HAVE_CURL_BROTLI', 1, 'Define to 1 if libcurl was built with brotli support.');
+			}
+'@
+        [System.IO.File]::WriteAllText($curl_config_w32, $curl_content.Replace($brotli_original, $brotli_replacement))
+        pm-echo "Patched ext/curl/config.w32 to link brotli libs"
+    }
+}
+
 mkdir $LIB_BUILD_DIR >> $log_file 2>&1
 cd $LIB_BUILD_DIR >> $log_file 2>&1
 
