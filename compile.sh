@@ -674,7 +674,7 @@ function build_snappy {
 		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
 	else
 		write_caching
-		pushd "$grpc_dir/cmake/build"
+		pushd "$snappy_dir/cmake/build"
 	fi
 
 	write_install
