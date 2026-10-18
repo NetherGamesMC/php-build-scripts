@@ -21,14 +21,14 @@ jobs:
             php-version-base: "8.1"
           - pm-version-major: 5
             php-version-base: "8.2"
-            special-release: default-latest #default = best for PM5, latest = display as latest on GitHub 
           - pm-version-major: 5
             php-version-base: "8.3"
           - pm-version-major: 5
             php-version-base: "8.4"
+            special-release: default-latest #default = best for PM5, latest = display as latest on GitHub 
           - pm-version-major: 5
             php-version-base: "8.5"
-            pm-preview: true
+            pm-preview: false
 
     uses: ./.github/workflows/main-pm-matrix.yml
     with:
