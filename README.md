@@ -1,19 +1,20 @@
 # PHP binaries & PHP build scripts for PocketMine-MP
-[![Build status](https://github.com/pmmp/php-build-scripts/actions/workflows/main.yml/badge.svg)](https://github.com/pmmp/php-build-scripts/actions/workflows/main.yml)
+[![Build status](https://github.com/axolotl-pm/PHP-Binaries/actions/workflows/main.yml/badge.svg)](https://github.com/axolotl-pm/PHP-Binaries/actions/workflows/main.yml)
 
 ## Prebuilt binaries
 ### Actively updated "latest" URLs
-- [PM5 default](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-latest)
-- [PM5 PHP 8.2](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-php-8.2-latest) (default for PM 5.10+)
-- [PM5 PHP 8.3](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-php-8.3-latest) (not officially supported, but works in PM 5.9+)
-- [PM5 PHP 8.4](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-php-8.4-latest) (not officially supported, but works in PM 5.33+)
+- [PM5 default](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-latest)
+- [PM5 PHP 8.2](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.2-latest) (Deprecated)
+- [PM5 PHP 8.3](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.3-latest) (Deprecated)
+- [PM5 PHP 8.4](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.4-latest) (default for PM 5.0+)
+- [PM5 PHP 8.5](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.5-latest)
 
 ### Legacy binaries, no longer updated
-- [PM4 PHP 8.0](https://github.com/pmmp/PHP-Binaries/releases/tag/pm4-php-8.0-latest) (default for PM 4.0+)
-- [PM4 PHP 8.1](https://github.com/pmmp/PHP-Binaries/releases/tag/pm4-php-8.1-latest) (default for PM 4.21+)
-- [PM4 PHP 8.2](https://github.com/pmmp/PHP-Binaries/releases/tag/pm4-php-8.2-latest) (never officially supported, but works in PM 4.12+)
-- [PM5 PHP 8.0](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-php-8.0-latest) (default for PM 5.0 alpha)
-- [PM5 PHP 8.1](https://github.com/pmmp/PHP-Binaries/releases/tag/pm5-php-8.1-latest) (default for PM 5.0+)
+- [PM4 PHP 8.0](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm4-php-8.0-latest) (default for PM 4.0+)
+- [PM4 PHP 8.1](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm4-php-8.1-latest) (default for PM 4.21+)
+- [PM4 PHP 8.2](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm4-php-8.2-latest) (never officially supported, but works in PM 4.12+)
+- [PM5 PHP 8.0](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.0-latest) (default for PM 5.0 alpha)
+- [PM5 PHP 8.1](https://github.com/axolotl-pm/PHP-Binaries/releases/tag/pm5-php-8.1-latest) (default for PM 5.0+)
 
 ## compile.sh
 
@@ -35,7 +36,7 @@ Bash script used to compile PHP on MacOS and Linux platforms. Make sure you have
 
 #### Android 64-bit (cross-compile)
 - Only aarch64 targets are supported for Android cross-compile.
-- The `aarch64-linux-musl` toolchain is required. You can compile and install it using https://github.com/pmmp/musl-cross-make (PMMP fork includes musl-libc patches for DNS resolver config path and increasing stack size limit for LevelDB)
+- The `aarch64-linux-musl` toolchain is required. You can compile and install it using https://github.com/axolotl-pm/musl-cross-make (PMMP fork includes musl-libc patches for DNS resolver config path and increasing stack size limit for LevelDB)
 
 | Script flags | Description                                                                                                 |
 |--------------|-------------------------------------------------------------------------------------------------------------|
@@ -53,6 +54,7 @@ Bash script used to compile PHP on MacOS and Linux platforms. Make sure you have
 | -x           | Specifies we are doing cross-compile                                                                        |
 | -P           | Set target to the specified major PocketMine-MP version specified (currently only `5` is supported)         |
 | -z           | PHP version to build, e.g `8.2` (optional, if not specified, will be auto-selected by PM version)           |
+| -r           | php-src git ref (branch, tag or commit) to build instead of the default for the selected PHP version        |
 
 ### Example:
 
@@ -77,6 +79,7 @@ This script doesn't accept parameters, but the following environment variables a
 | `PM_VERSION_MAJOR` | Major version of PocketMine-MP to build for (currently only `5` is supported)                             |
 | `PHP_VERSION_BASE` | PHP version to build, e.g `8.2` (optional, if not specified, will be auto-selected by PM version)         |
 | `PHP_JIT_SUPPORT`  | Whether to compile with OPcache JIT, set to `1` for yes                                                   |
+| `PHP_GIT_REV`      | php-src git ref (branch, tag or commit) to build instead of the default for the selected PHP version      |
 
 ## For developers: Version info sources
 ### Libraries
@@ -102,19 +105,19 @@ This script doesn't accept parameters, but the following environment variables a
 | Link to package | Needed for | Notes |
 |:----------------|:-----------|:------|
 | [PHP](https://www.php.net/releases/?json&version=8.2) | Everything | Replace 8.2 in the URL with your chosen version |
-| [pmmpthread](https://github.com/pmmp/ext-pmmpthread/releases) | PHP threading | |
+| [pmmpthread](https://github.com/axolotl-pm/ext-pmmpthread/releases) | PHP threading | |
 | [yaml](https://github.com/php/pecl-file_formats-yaml/tags) | YAML config parsing | Yes, the mix of - and _ is intentional. Don't ask me. |
-| [leveldb](https://github.com/pmmp/php-leveldb/commits/pmmp-mojang-compatible/) | Bedrock world support | Custom version to provide `LEVELDB_ZLIB_RAW_COMPRESSION` support |
-| [chunkutils2](https://github.com/pmmp/ext-chunkutils2/releases) | `PalettedBlockArray` and other low-level stuff | |
+| [leveldb](https://github.com/axolotl-pm/php-leveldb/commits/pmmp-mojang-compatible/) | Bedrock world support | Custom version to provide `LEVELDB_ZLIB_RAW_COMPRESSION` support |
+| [chunkutils2](https://github.com/axolotl-pm/ext-chunkutils2/releases) | `PalettedBlockArray` and other low-level stuff | |
 | [xdebug](https://github.com/xdebug/xdebug/releases) | Debugging | Not needed for production |
 | [igbinary](https://github.com/igbinary/igbinary/releases) | Faster serialization, mostly for moving stuff between threads | Non-essential, could be ditched if necessary |
 | [crypto](https://github.com/bukka/php-crypto/tags) | Bedrock packet encryption | |
-| [recursionguard](https://github.com/pmmp/ext-recursionguard/releases) | Debugging | Not needed for production |
-| [libdeflate](https://github.com/pmmp/ext-libdeflate/releases) | Faster network compression | Non-essential but provides significant performance advantage over zlib |
-| [morton](https://github.com/pmmp/ext-morton) | Packing X/Z and X/Y/Z coordinates into ints in a format suitable for PHP array keys | Needed for performance |
-| [xxhash](https://github.com/pmmp/ext-xxhash/releases) | Not currently used | Could be replaced by `hash()` in recent versions of PHP but this extension has much better performance |
-| [arraydebug](https://github.com/pmmp/ext-arraydebug/tags) | Debugging array hash collisions | |
-| [encoding](https://github.com/pmmp/ext-encoding/releases) | Disk & network data encoding & decoding | Significantly faster alternative to [BinaryUtils](https://github.com/pmmp/BinaryUtils) |
+| [recursionguard](https://github.com/axolotl-pm/ext-recursionguard/releases) | Debugging | Not needed for production |
+| [libdeflate](https://github.com/axolotl-pm/ext-libdeflate/releases) | Faster network compression | Non-essential but provides significant performance advantage over zlib |
+| [morton](https://github.com/axolotl-pm/ext-morton) | Packing X/Z and X/Y/Z coordinates into ints in a format suitable for PHP array keys | Needed for performance |
+| [xxhash](https://github.com/axolotl-pm/ext-xxhash/releases) | Not currently used | Could be replaced by `hash()` in recent versions of PHP but this extension has much better performance |
+| [arraydebug](https://github.com/axolotl-pm/ext-arraydebug/tags) | Debugging array hash collisions | |
+| [encoding](https://github.com/axolotl-pm/ext-encoding/releases) | Disk & network data encoding & decoding | Significantly faster alternative to [BinaryUtils](https://github.com/pmmp/BinaryUtils) |
 
 ### Misc
 

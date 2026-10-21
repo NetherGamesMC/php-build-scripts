@@ -21,7 +21,7 @@ on:
         type: boolean
 
 env:
-  MUSL_CROSS_MAKE_VERSION: 43fcb1e63786b96add78f89d7454709ae0159fa0
+  MUSL_CROSS_MAKE_VERSION: b7b27ee2f37b5794658dce8a611f91feb456bf91
 
 jobs:
   linux:
@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-24.04
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -42,7 +42,7 @@ jobs:
 
       - name: Prepare compile.sh download cache
         id: download-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ./download_cache
           key: compile-sh-cache-ssl-https-${{ hashFiles('./compile.sh') }}
@@ -61,7 +61,7 @@ jobs:
           tar -czf ./Z-PHP-${{ inputs.php-version-base }}-Linux-x86_64-PM${{ inputs.pm-version-major }}-debugging-symbols.tar.gz bin-debug
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: PHP-${{ inputs.php-version-base }}-Linux-PM${{ inputs.pm-version-major }}
@@ -76,7 +76,7 @@ jobs:
         run: tar -czf workspace.tar.gz install_data
 
       - name: Upload workspace
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: PHP-${{ inputs.php-version-base }}-Linux-workspace-PM${{ inputs.pm-version-major }}
@@ -89,11 +89,11 @@ jobs:
     runs-on: windows-2022
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Prepare download cache
         id: download-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ./download_cache
           key: windows-cache-${{ hashFiles('./windows-compile-vs.ps1') }}
@@ -114,7 +114,7 @@ jobs:
           move temp\*.zip .
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: PHP-${{ inputs.php-version-base }}-Windows-PM${{ inputs.pm-version-major }}
@@ -136,7 +136,7 @@ jobs:
       contents: write
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Update latest tag target
         run: |
@@ -146,7 +146,7 @@ jobs:
           git push -f origin pm${{ inputs.pm-version-major }}-latest
 
       - name: Download artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: ${{ github.workspace }}
           pattern: "*PHP-${{ inputs.php-version-base }}-*-PM${{ inputs.pm-version-major }}"
@@ -156,7 +156,7 @@ jobs:
           curl -L https://raw.githubusercontent.com/php/php-src/refs/heads/PHP-${{ inputs.php-version-base }}/.gdbinit -o Z-PHP-${{ inputs.php-version-base }}.gdbinit
 
       - name: Upload .gdbinit artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: PHP-${{ inputs.php-version-base }}.gdbinit
           path: |
@@ -188,7 +188,7 @@ jobs:
           echo DATE=$(date -u +'%d %b %Y') >> $GITHUB_OUTPUT
 
       - name: Update recommended PM release
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         if: ${{ inputs.special-release != 'none' }}
         with:
           artifacts: |
@@ -205,7 +205,7 @@ jobs:
           prerelease: ${{ inputs.pm-preview == true }}
 
       - name: Update php-version PM release
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           artifacts: |
             ${{ github.workspace }}/*PHP-*-PM*/*.tar.gz
