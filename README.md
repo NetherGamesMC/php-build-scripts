@@ -53,6 +53,7 @@ Bash script used to compile PHP on MacOS and Linux platforms. Make sure you have
 | -x           | Specifies we are doing cross-compile                                                                        |
 | -P           | Set target to the specified major PocketMine-MP version specified (currently only `5` is supported)         |
 | -z           | PHP version to build, e.g `8.2` (optional, if not specified, will be auto-selected by PM version)           |
+| -r           | php-src git ref (branch, tag or commit) to build instead of the default for the selected PHP version        |
 
 ### Example:
 
@@ -77,6 +78,7 @@ This script doesn't accept parameters, but the following environment variables a
 | `PM_VERSION_MAJOR` | Major version of PocketMine-MP to build for (currently only `5` is supported)                             |
 | `PHP_VERSION_BASE` | PHP version to build, e.g `8.2` (optional, if not specified, will be auto-selected by PM version)         |
 | `PHP_JIT_SUPPORT`  | Whether to compile with OPcache JIT, set to `1` for yes                                                   |
+| `PHP_GIT_REV`      | php-src git ref (branch, tag or commit) to build instead of the default for the selected PHP version      |
 
 ## For developers: Version info sources
 ### Libraries

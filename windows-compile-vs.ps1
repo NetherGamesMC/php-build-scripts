@@ -1,6 +1,7 @@
 ﻿$ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 
+# Entries may be "version@git-ref" to build from a ref instead of the php-<version> tag.
 $PHP_VERSIONS=@("8.1.34", "8.2.35", "8.3.36", "8.4.27", "8.5.12")
 
 $PHP_SDK_VER="2.4.0"
@@ -120,6 +121,8 @@ if ($env:PHP_VERSION_BASE -ne $null) {
     $PHP_VERSION_BASE=$env:PHP_VERSION_BASE
 }
 
+$PHP_GIT_REV_OVERRIDE=$env:PHP_GIT_REV
+
 $PHP_DEBUG_BUILD=0
 if ($env:PHP_DEBUG_BUILD -eq 1) {
 	$PHP_DEBUG_BUILD=1
@@ -170,7 +173,11 @@ if ($PHP_VERSION_BASE -eq "auto") {
 
 foreach ($version in $PHP_VERSIONS) {
     if ($version -like "$PHP_VERSION_BASE.*") {
-        $PHP_VER=$version
+        $PHP_VER=($version -split "@")[0]
+        $PHP_GIT_REV="php-$PHP_VER"
+        if ($version.Contains("@")) {
+            $PHP_GIT_REV=($version -split "@", 2)[1]
+        }
         break
     }
 }
@@ -180,8 +187,14 @@ if ($PHP_VER -eq "") {
     exit 1
 }
 
-#don't really need these except for dev versions
-$PHP_GIT_REV="php-$PHP_VER"
+if ($PHP_GIT_REV_OVERRIDE) {
+    $PHP_GIT_REV=$PHP_GIT_REV_OVERRIDE
+}
+
+if ($PHP_GIT_REV -ne "php-$PHP_VER") {
+    pm-echo "[WARNING] Building PHP $PHP_VER from ref $PHP_GIT_REV instead of the release tag"
+}
+
 $PHP_DISPLAY_VER="$PHP_VER"
 
 $CMAKE_TARGET="Visual Studio 17 2022"
@@ -473,7 +486,7 @@ function download-php {
     $file = download-file "https://github.com/php/php-src/archive/$PHP_GIT_REV.zip" "php"
     write-extracting
     unzip-file $file $pwd
-    Move-Item "php-src-$PHP_GIT_REV" $SOURCES_PATH >> $log_file 2>&1
+    Move-Item php-src-* $SOURCES_PATH >> $log_file 2>&1
     write-done
 }
 
