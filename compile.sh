@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #### Entries may be "version@git-ref" to build from a ref instead of the php-<version> tag.
-PHP_VERSIONS=("8.1.34" "8.2.35" "8.3.36" "8.4.27" "8.5.12")
+#### 8.1 is EOL, no tag exists for the CVE-2026-109618/109619 fix
+PHP_VERSIONS=("8.1.34@1d7dec178a094e6e75b229ce22754045f8c6070a" "8.2.35" "8.3.36" "8.4.27" "8.5.12")
 
 #### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
 #### Use commit hashes to avoid this.
