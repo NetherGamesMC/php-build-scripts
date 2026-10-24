@@ -1,7 +1,9 @@
 ﻿$ErrorActionPreference="Stop"
 $ProgressPreference="SilentlyContinue"
 
-$PHP_VERSIONS=@("8.1.34", "8.2.30", "8.3.30", "8.4.17", "8.5.2")
+# Entries may be "version@git-ref" to build from a ref instead of the php-<version> tag.
+# 8.1 is EOL, no tag exists for the CVE-2026-109618/109619 fix
+$PHP_VERSIONS=@("8.1.34@1d7dec178a094e6e75b229ce22754045f8c6070a", "8.2.35", "8.3.36", "8.4.27", "8.5.12")
 
 $PHP_SDK_VER="2.4.0"
 $ARCH="x64"
@@ -17,6 +19,7 @@ $LIBRDKAFKA_VER="2.12.1"
 $LIBZSTD_VER="1.5.7"
 $LIBGRPC_VER="1.76.0"
 $LIBSNAPPY_VER="1.2.2"
+$LIBDATACHANNEL_VER="443f6934d9007eb7076ab7825ba330f355fcbead" #v0.24.5 - see above note about "v" prefixes
 
 $PHP_PMMPTHREAD_VER="6.3.0"
 $PHP_YAML_VER="2.3.0"
@@ -36,6 +39,7 @@ $PHP_VANILLAGENERATOR_VER="2.1.7"
 $PHP_LIBKAFKA_VER="6.0.4"
 $PHP_ZSTD_VER="0.15.2"
 $PHP_GRPC_VER="1.76.0"
+$PHP_WEBRTC_VER="0.3.1"
 
 $PHP_IGBINARY_VER_PHP85="3.2.17RC1"
 
@@ -127,6 +131,8 @@ if ($env:PHP_VERSION_BASE -ne $null) {
     $PHP_VERSION_BASE=$env:PHP_VERSION_BASE
 }
 
+$PHP_GIT_REV_OVERRIDE=$env:PHP_GIT_REV
+
 $PHP_DEBUG_BUILD=0
 if ($env:PHP_DEBUG_BUILD -eq 1) {
 	$PHP_DEBUG_BUILD=1
@@ -177,7 +183,11 @@ if ($PHP_VERSION_BASE -eq "auto") {
 
 foreach ($version in $PHP_VERSIONS) {
     if ($version -like "$PHP_VERSION_BASE.*") {
-        $PHP_VER=$version
+        $PHP_VER=($version -split "@")[0]
+        $PHP_GIT_REV="php-$PHP_VER"
+        if ($version.Contains("@")) {
+            $PHP_GIT_REV=($version -split "@", 2)[1]
+        }
         break
     }
 }
@@ -187,8 +197,14 @@ if ($PHP_VER -eq "") {
     exit 1
 }
 
-#don't really need these except for dev versions
-$PHP_GIT_REV="php-$PHP_VER"
+if ($PHP_GIT_REV_OVERRIDE) {
+    $PHP_GIT_REV=$PHP_GIT_REV_OVERRIDE
+}
+
+if ($PHP_GIT_REV -ne "php-$PHP_VER") {
+    pm-echo "[WARNING] Building PHP $PHP_VER from ref $PHP_GIT_REV instead of the release tag"
+}
+
 $PHP_DISPLAY_VER="$PHP_VER"
 
 $CMAKE_TARGET="Visual Studio 17 2022"
@@ -379,6 +395,7 @@ function download-sdk {
     }
     write-done
 }
+
 
 function sdk-command {
     param ([string] $command, [string] $errorMessage = "")
@@ -648,6 +665,33 @@ function build-libdeflate {
     Pop-Location
 }
 
+function build-libdatachannel {
+    write-library "libdatachannel" $LIBDATACHANNEL_VER
+    write-download
+    (& cmd.exe /c "git clone https://github.com/paullouisageneau/libdatachannel.git libdatachannel 2>&1") >> $log_file
+    Push-Location libdatachannel
+    write-status "preparing"
+    (& cmd.exe /c "git checkout $LIBDATACHANNEL_VER 2>&1") >> $log_file
+    (& cmd.exe /c "git submodule update --init --recursive 2>&1") >> $log_file
+
+    write-configure
+    sdk-command "cmake -G `"$CMAKE_TARGET`" -A `"$ARCH`" $CMAKE_TOOLSET_FLAG^`
+        -DCMAKE_PREFIX_PATH=`"$DEPS_DIR`"^`
+        -DCMAKE_INSTALL_PREFIX=`"$DEPS_DIR`"^`
+        -DOPENSSL_ROOT_DIR=`"$DEPS_DIR`"^`
+        -DNO_EXAMPLES=ON^`
+        -DNO_TESTS=ON^`
+        -DNO_MEDIA=ON^`
+        `"$pwd`" || exit 1"
+    write-compile
+    sdk-command "msbuild ALL_BUILD.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+    write-install
+    sdk-command "msbuild INSTALL.vcxproj /p:Configuration=$MSBUILD_CONFIGURATION /m || exit 1"
+    Copy-Item "$MSBUILD_CONFIGURATION\datachannel.pdb" "$DEPS_DIR\bin" >> $log_file 2>&1
+    write-done
+    Pop-Location
+}
+
 function download-php {
     write-library "PHP" $PHP_VER
     write-download
@@ -655,7 +699,7 @@ function download-php {
     $file = download-file "https://github.com/php/php-src/archive/$PHP_GIT_REV.zip" "php"
     write-extracting
     unzip-file $file $pwd
-    Move-Item "php-src-$PHP_GIT_REV" $SOURCES_PATH >> $log_file 2>&1
+    Move-Item php-src-* $SOURCES_PATH >> $log_file 2>&1
     write-done
 }
 
@@ -698,6 +742,7 @@ function download-php-extensions {
     # to find these dependencies if the folder name were to change
     Move-Item "ext-chunkutils2-$PHP_CHUNKUTILS2_VER" "chunkutils2" -Force
     Move-Item "ext-morton-$PHP_MORTON_VER" "morton" -Force
+    get-github-extension "webrtc"                $PHP_WEBRTC_VER                "axolotl-pm" "ext-webrtc"
 
     write-library "php-ext crypto" $PHP_CRYPTO_VER
     write-download
@@ -768,6 +813,8 @@ build-yaml
 build-leveldb
 build-libdeflate
 
+build-libdatachannel
+
 cd $BASE_PATH >> $log_file 2>&1
 
 download-php-extensions
@@ -812,6 +859,7 @@ sdk-command "configure^`
     --enable-recursionguard=shared^`
     --enable-sockets^`
     --enable-tokenizer^`
+    --enable-webrtc=shared^`
     --enable-xmlreader^`
     --enable-xmlwriter^`
     --enable-xxhash^`
@@ -826,6 +874,7 @@ sdk-command "configure^`
     --with-gmp^`
     --with-iconv^`
     --with-leveldb=shared^`
+    --with-libdatachannel=`"$DEPS_DIR`"^`
     --with-libdeflate=shared^`
     --with-libxml^`
     --with-mysqli=shared^`
@@ -900,6 +949,7 @@ append-file-utf8 "extension=php_leveldb.dll" $php_ini
 append-file-utf8 "extension=php_crypto.dll" $php_ini
 append-file-utf8 "extension=php_libdeflate.dll" $php_ini
 append-file-utf8 "extension=php_encoding.dll" $php_ini
+append-file-utf8 "extension=php_webrtc.dll" $php_ini
 append-file-utf8 "igbinary.compact_strings=0" $php_ini
 if ($PHP_VERSION_ID -lt 80500) {
     append-file-utf8 "zend_extension=php_opcache.dll" $php_ini

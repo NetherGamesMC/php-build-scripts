@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-PHP_VERSIONS=("8.1.34" "8.2.30" "8.3.30" "8.4.17" "8.5.2")
+#### Entries may be "version@git-ref" to build from a ref instead of the php-<version> tag.
+#### 8.1 is EOL, no tag exists for the CVE-2026-109618/109619 fix
+PHP_VERSIONS=("8.1.34@1d7dec178a094e6e75b229ce22754045f8c6070a" "8.2.35" "8.3.36" "8.4.27" "8.5.12")
 
 #### NOTE: Tags with "v" prefixes behave weirdly in the GitHub API. They'll be stripped in some places but not others.
 #### Use commit hashes to avoid this.
@@ -26,6 +28,7 @@ LIBZSTD_VER="1.5.7"
 LIBGRPC_VER="1.76.0"
 LIBSNAPPY_VER="1.2.2"
 SASL2_VERSION="2.1.28"
+LIBDATACHANNEL_VERSION="443f6934d9007eb7076ab7825ba330f355fcbead" #v0.24.5 - see above note about "v" prefixes
 
 EXT_PMMPTHREAD_VERSION="de0d03b6ffecb1a03c06bb47912c2257c0b02b65"
 EXT_YAML_VERSION="2.3.0"
@@ -49,6 +52,7 @@ EXT_VANILLAGENERATOR_VERSION="abd059fd2ca79888aab3b9c5070d83ceea55fada"
 # branch name (e.g. "master"), tag, or 40-char commit SHA — the build step
 # below switches between `git checkout` and tarball download accordingly.
 EXT_QUICHE_VERSION="master"
+EXT_WEBRTC_VERSION="0.3.1"
 
 EXT_IGBINARY_VERSION_PHP85="3.2.17RC1"
 
@@ -180,7 +184,7 @@ SEPARATE_SYMBOLS="no"
 
 PHP_VERSION_BASE="auto"
 
-while getopts "::t:j:sdDFxfgnva:P:c:l:Jiz:" OPTION; do
+while getopts "::t:j:sdDFxfgnva:P:c:l:Jiz:r:" OPTION; do
 
 	case $OPTION in
 		l)
@@ -263,6 +267,9 @@ while getopts "::t:j:sdDFxfgnva:P:c:l:Jiz:" OPTION; do
 		z)
 			PHP_VERSION_BASE="$OPTARG"
 			;;
+		r)
+			PHP_GIT_REV_OVERRIDE="$OPTARG"
+			;;
 		\?)
 			write_error "Invalid option: -$OPTARG"
 			exit 1
@@ -308,7 +315,11 @@ fi
 
 for version in "${PHP_VERSIONS[@]}"; do
 	if [[ "$version" == "$PHP_VERSION_BASE."* ]]; then
-		PHP_VERSION="$version"
+		PHP_VERSION="${version%%@*}"
+		PHP_GIT_REV="php-$PHP_VERSION"
+		if [[ "$version" == *"@"* ]]; then
+			PHP_GIT_REV="${version#*@}"
+		fi
 		break
 	fi
 done
@@ -317,6 +328,14 @@ if [ "$PHP_VERSION" == "" ]; then
 	write_error "Unsupported PHP base version $PHP_VERSION_BASE"
 	write_error "Example inputs: 8.2, 8.3"
 	exit 1
+fi
+
+if [ -n "$PHP_GIT_REV_OVERRIDE" ]; then
+	PHP_GIT_REV="$PHP_GIT_REV_OVERRIDE"
+fi
+
+if [ "$PHP_GIT_REV" != "php-$PHP_VERSION" ]; then
+	write_out "WARNING" "Building PHP $PHP_VERSION from ref $PHP_GIT_REV instead of the release tag"
 fi
 
 PHP_VERSION_ID=$(php_version_id "$PHP_VERSION")
@@ -413,17 +432,17 @@ function git_download_file {
       tar xzf "$DOWNLOAD_CACHE/$cached_filename" $git_path >> "$DIR/install.log" 2>&1
     else
       echo "Downloading git repository to cache: $url" >> "$DIR/install.log"
-      git clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
+      git -c gc.auto=0 -c maintenance.auto=false clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
       pushd $git_path >> "$DIR/install.log" 2>&1
-      git submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
+      git -c gc.auto=0 -c maintenance.auto=false submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
       popd >> "$DIR/install.log" 2>&1
       tar czf "$DOWNLOAD_CACHE/$cached_filename" $git_path >> "$DIR/install.log" 2>&1
     fi
   else
     echo "Downloading non-cached git repository: $url" >> "$DIR/install.log"
-    git clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
+    git -c gc.auto=0 -c maintenance.auto=false clone -b "$git_branch" --depth=1 $url $git_path >> "$DIR/install.log" 2>&1
     pushd $git_path >> "$DIR/install.log" 2>&1
-    git submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
+    git -c gc.auto=0 -c maintenance.auto=false submodule update --depth=1 --init >> "$DIR/install.log" 2>&1
     popd >> "$DIR/install.log" 2>&1
   fi
 }
@@ -641,8 +660,8 @@ set -e
 write_library "PHP" "$PHP_VERSION"
 write_download
 
-download_github_src "php/php-src" "php-$PHP_VERSION" "php" | tar -zx >> "$DIR/install.log" 2>&1
-mv php-src-php-$PHP_VERSION php
+mkdir php
+download_github_src "php/php-src" "$PHP_GIT_REV" "php" | tar -zx --strip-components=1 -C php >> "$DIR/install.log" 2>&1
 write_done
 
 function build_snappy {
@@ -1374,6 +1393,49 @@ function build_libdeflate {
 	fi
 }
 
+function build_libdatachannel {
+	write_library libdatachannel "$LIBDATACHANNEL_VERSION"
+	local libdatachannel_dir="./libdatachannel-$LIBDATACHANNEL_VERSION"
+
+	if [ "$DO_STATIC" == "yes" ]; then
+		local CMAKE_LIBDATACHANNEL_EXTRA_FLAGS="-DBUILD_SHARED_LIBS=OFF"
+	else
+		local CMAKE_LIBDATACHANNEL_EXTRA_FLAGS="-DBUILD_SHARED_LIBS=ON"
+	fi
+
+	if cant_use_cache "$libdatachannel_dir"; then
+		rm -rf "$libdatachannel_dir"
+		write_download
+		#source archives don't ship the deps/ submodules, and cmake needs them unless every dep is provided as a system library
+		git clone https://github.com/paullouisageneau/libdatachannel.git "$libdatachannel_dir" >> "$DIR/install.log" 2>&1
+		cd "$libdatachannel_dir"
+		git checkout "$LIBDATACHANNEL_VERSION" >> "$DIR/install.log" 2>&1
+		git submodule update --init --recursive >> "$DIR/install.log" 2>&1
+		write_configure
+		cmake . \
+			-DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" \
+			-DCMAKE_PREFIX_PATH="$INSTALL_DIR" \
+			-DCMAKE_INSTALL_LIBDIR=lib \
+			-DOPENSSL_ROOT_DIR="$INSTALL_DIR" \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_INSTALL_RPATH='$ORIGIN/../lib' \
+			$CMAKE_GLOBAL_EXTRA_FLAGS \
+			$CMAKE_LIBDATACHANNEL_EXTRA_FLAGS \
+			-DNO_EXAMPLES=ON \
+			-DNO_TESTS=ON \
+			-DNO_MEDIA=ON >> "$DIR/install.log" 2>&1
+		write_compile
+		make -j $THREADS >> "$DIR/install.log" 2>&1 && mark_cache
+	else
+		write_caching
+		cd "$libdatachannel_dir"
+	fi
+	write_install
+	make install >> "$DIR/install.log" 2>&1
+	cd ..
+	write_done
+}
+
 cd "$LIB_BUILD_DIR"
 
 build_snappy
@@ -1407,6 +1469,7 @@ build_libxml2
 build_libzip
 build_sqlite3
 build_libdeflate
+build_libdatachannel
 
 # PECL libraries
 
@@ -1480,6 +1543,7 @@ get_github_extension "vanillagenerator" "$EXT_VANILLAGENERATOR_VERSION" "NetherG
 get_github_extension "rdkafka" "$EXT_RDKAFKA_VERSION" "arnaud-lb" "php-rdkafka"
 
 get_github_extension "zstd" "$EXT_ZSTD_VERSION" "kjdev" "php-ext-zstd"
+get_github_extension "webrtc" "$EXT_WEBRTC_VERSION" "axolotl-pm" "ext-webrtc"
 
 cafile=""
 if [[ "$COMPILE_TARGET" == "mac"* ]]; then
@@ -1678,7 +1742,7 @@ if [ "$FSANITIZE_OPTIONS" != "" ]; then
 	LDFLAGS="-fsanitize=$FSANITIZE_OPTIONS $LDFLAGS"
 fi
 
-RANLIB=$RANLIB CFLAGS="$CFLAGS $FLAGS_LTO" CXXFLAGS="$CXXFLAGS $FLAGS_LTO" LDFLAGS="$LDFLAGS $FLAGS_LTO" ./configure $PHP_OPTIMIZATION --prefix="$INSTALL_DIR" \
+RANLIB=$RANLIB CFLAGS="-std=gnu17 $CFLAGS $FLAGS_LTO" CXXFLAGS="$CXXFLAGS $FLAGS_LTO" LDFLAGS="$LDFLAGS $FLAGS_LTO" ./configure $PHP_OPTIMIZATION --prefix="$INSTALL_DIR" \
 --exec-prefix="$INSTALL_DIR" \
 --with-curl \
 --with-zlib \
@@ -1744,6 +1808,8 @@ $HAVE_MYSQLI \
 --enable-xxhash \
 --enable-arraydebug \
 --enable-encoding \
+--enable-webrtc \
+--with-libdatachannel="$INSTALL_DIR" \
 $HAVE_VALGRIND \
 $CONFIGURE_FLAGS >> "$DIR/install.log" 2>&1
 write_compile

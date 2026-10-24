@@ -22,7 +22,6 @@ jobs:
             special-release: default-latest #default = best for PM5, latest = display as latest on GitHub
           - pm-version-major: 5
             php-version-base: "8.5"
-            pm-preview: true
 
     uses: ./.github/workflows/main-pm-matrix.yml
     with:
@@ -40,7 +39,7 @@ jobs:
 
     steps:
       - name: Download artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           path: ${{ github.workspace }}
 
@@ -54,7 +53,7 @@ jobs:
           echo -e "\n\n\n" >> changelog.md
 
       - name: Create release
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           artifacts: |
             ${{ github.workspace }}/*PHP-*-PM*/*.tar.gz
